@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>诡谜局 · 兑换码管理后台</title>
+<style>
+  *{box-sizing:border-box;margin:0;padding:0}
+  body{font-family:'Segoe UI',system-ui,sans-serif;background:#0d0d0d;color:#e0e0e0;
+    min-height:100vh;display:flex;justify-content:center;padding:40px 20px}
+  .container{max-width:800px;width:100%}
+  h1{color:#d4a853;text-align:center;margin-bottom:8px;font-size:28px;letter-spacing:3px}
+  .sub{text-align:center;color:#666;font-size:12px;margin-bottom:32px}
+  .card{background:#1a1a1a;border:1px solid #2a2a2a;border-radius:12px;padding:24px;margin-bottom:20px}
+  .card h2{font-size:16px;color:#d4a853;margin-bottom:16px;letter-spacing:1px}
+  .form-row{display:flex;gap:12px;align-items:end;flex-wrap:wrap;margin-bottom:12px}
+  .form-group{flex:1;min-width:120px}
+  .form-group label{display:block;font-size:11px;color:#888;margin-bottom:4px;letter-spacing:0.5px}
+  .form-group input,.form-group select,.form-group textarea{width:100%;padding:10px 12px;background:#111;border:1px solid #333;
+    border-radius:8px;color:#e0e0e0;font-size:14px;outline:none;transition:border-color .2s}
+  .form-group input:focus,.form-group select:focus,.form-group textarea:focus{border-color:#d4a853}
+  .form-group textarea{resize:vertical;min-height:50px}
+  button{padding:10px 24px;border:none;border-radius:8px;font-size:14px;font-weight:600;cursor:pointer;
+    transition:all .2s;letter-spacing:0.5px}
+  .btn-primary{background:linear-gradient(135deg,#d4a853,#a07830);color:#1a1005}
+  .btn-primary:hover{box-shadow:0 0 20px rgba(212,168,83,0.3);transform:translateY(-1px)}
+  .btn-primary:disabled{opacity:0.4;cursor:not-allowed;transform:none}
+  .btn-ghost{background:transparent;border:1px solid #333;color:#888}
+  .btn-ghost:hover{border-color:#d4a853;color:#d4a853}
+  .btn-sm{padding:6px 16px;font-size:12px}
+  .btn-danger{background:#7f1d1d;border:1px solid #991b1b;color:#fca5a5}
+  .btn-danger:hover{background:#991b1b}
+  #code-list{display:flex;flex-wrap:wrap;gap:8px;margin-top:12px}
+  .code-chip{background:#111;border:1px solid #2a2a2a;border-radius:6px;padding:6px 12px;
+    font-family:'Courier New',monospace;font-size:14px;color:#d4a853;letter-spacing:1px}
+  .status{text-align:center;margin-top:12px;font-size:13px;min-height:20px}
+  .status.success{color:#4ade80}
+  .status.error{color:#f87171}
+  .status.info{color:#888}
+  .warning{background:rgba(212,168,83,0.08);border:1px solid rgba(212,168,83,0.2);border-radius:8px;
+    padding:12px;font-size:12px;color:#888;line-height:1.8;margin-top:16px}
+  .env-info{text-align:center;font-size:11px;color:#444;margin-top:24px}
+  hr{border:none;border-top:1px solid #222;margin:16px 0}
+  .copy-all-btn{width:100%;margin-top:8px}
+  textarea.code-area{width:100%;height:120px;background:#111;border:1px solid #333;border-radius:8px;
+    color:#d4a853;font-family:'Courier New',monospace;font-size:13px;padding:10px;resize:vertical;margin-top:8px}
+  /* 批次表格 */
+  .batch-table{width:100%;border-collapse:collapse;margin-top:12px;font-size:12px}
+  .batch-table th{text-align:left;padding:8px;border-bottom:2px solid #333;color:#888;font-weight:600}
+  .batch-table td{padding:8px;border-bottom:1px solid #222;font-family:'Courier New',monospace}
+  .batch-table .used{color:#4ade80}
+  .batch-table .active{color:#d4a853}
+  .batch-table .disabled{color:#f87171}
+  .stat-row{display:flex;gap:16px;margin-bottom:12px}
+  .stat-chip{background:#111;border:1px solid #2a2a2a;border-radius:8px;padding:8px 16px;text-align:center;flex:1}
+  .stat-chip .num{font-size:24px;font-weight:700;color:#d4a853}
+  .stat-chip .lbl{font-size:11px;color:#666}
+  /* 追溯日志区 */
+  .log-section{background:#0a0a0a;border:1px solid #1a1a1a;border-radius:8px;padding:12px;margin-top:12px;max-height:300px;overflow-y:auto}
+  .log-entry{font-family:'Courier New',monospace;font-size:11px;padding:4px 0;border-bottom:1px solid #111;line-height:1.6}
+  .log-entry .ts{color:#666}
+  .log-entry .code-val{color:#d4a853}
+  .log-entry .user-val{color:#60a5fa}
+  .log-entry .ch-val{color:#4ade80}
+  .tabs{display:flex;gap:0;margin-bottom:16px}
+  .tab{padding:8px 20px;background:transparent;border:1px solid #222;border-radius:8px 8px 0 0;color:#666;cursor:pointer;font-size:13px}
+  .tab.active{background:#1a1a1a;color:#d4a853;border-bottom-color:#1a1a1a}
+  .tab-content{display:none}
+  .tab-content.active{display:block}
+</style>
+</head>
+<body>
+<div class="container">
+  <h1>🎫 诡谜局</h1>
+  <div class="sub">兑换码管理后台 · 全链路追溯</div>
+
+  <div class="tabs">
+    <button class="tab active" onclick="switchTab('generate')">📦 生成兑换码</button>
+    <button class="tab" onclick="switchTab('trace')">🔍 追溯查询</button>
+    <button class="tab" onclick="switchTab('batch')">📊 批次管理</button>
+  </div>
+
+  <!-- ====== Tab: 生成 ====== -->
+  <div class="tab-content active" id="tab-generate">
+    <div class="card">
+      <h2>📦 批量生成兑换码</h2>
+      <div class="form-row">
+        <div class="form-group" style="max-width:80px">
+          <label>数量</label>
+          <input type="number" id="gen-count" value="10" min="1" max="200">
+        </div>
+        <div class="form-group" style="max-width:120px">
+          <label>前缀</label>
+          <select id="gen-prefix">
+            <option value="GMJ">GMJ - 通用</option>
+            <option value="VIP">VIP - 活动</option>
+            <option value="TST">TST - 测试</option>
+            <option value="SP">SP - 特别版</option>
+          </select>
+        </div>
+        <div class="form-group" style="max-width:140px">
+          <label>销售渠道</label>
+          <select id="gen-channel">
+            <option value="wechat">💬 微信私域</option>
+            <option value="xianyu">🐟 闲鱼</option>
+            <option value="taobao">🛒 淘宝</option>
+            <option value="other">📦 其他</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>买家备注（微信昵称/闲鱼ID/订单号 — 关键追溯依据）</label>
+          <input type="text" id="gen-buyer" placeholder="例：微信-张三 / 闲鱼-小鱼儿123 / 订单号-TB20260629">
+        </div>
+        <div class="form-group" style="max-width:140px">
+          <label>管理密钥</label>
+          <input type="password" id="gen-key" placeholder="guimiju2026">
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn-primary" id="btn-gen" onclick="generate()">生成</button>
+        </div>
+      </div>
+      <div class="status" id="gen-status"></div>
+      <div id="code-list"></div>
+      <textarea class="code-area" id="code-textarea" placeholder="生成的兑换码将显示在这里..." readonly style="display:none"></textarea>
+      <button class="btn-ghost btn-sm copy-all-btn" id="btn-copy-all" onclick="copyAll()" style="display:none">📋 复制全部兑换码</button>
+    </div>
+  </div>
+
+  <!-- ====== Tab: 追溯 ====== -->
+  <div class="tab-content" id="tab-trace">
+    <div class="card">
+      <h2>🔍 单码追溯</h2>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>兑换码</label>
+          <input type="text" id="query-code" placeholder="输入兑换码查询完整使用记录" style="text-transform:uppercase">
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn-ghost" onclick="queryCode()">查询</button>
+        </div>
+      </div>
+      <div class="status" id="query-status"></div>
+      <div id="query-detail" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <!-- ====== Tab: 批次 ====== -->
+  <div class="tab-content" id="tab-batch">
+    <div class="card">
+      <h2>📊 批次查询</h2>
+      <div class="form-row">
+        <div class="form-group" style="flex:2">
+          <label>批次号（生成兑换码时自动产生，格式: 前缀-日期-随机码）</label>
+          <input type="text" id="batch-id" placeholder="例：GMJ-20260629-X7K2">
+        </div>
+        <div class="form-group" style="max-width:140px">
+          <label>管理密钥</label>
+          <input type="password" id="batch-key" placeholder="guimiju2026">
+        </div>
+        <div>
+          <label>&nbsp;</label>
+          <button class="btn-ghost" onclick="queryBatch()">查询批次</button>
+        </div>
+      </div>
+      <div class="status" id="batch-status"></div>
+      <div id="batch-detail" style="margin-top:12px"></div>
+    </div>
+  </div>
+
+  <div class="warning">
+    ⚠️ <strong>追溯与防举报指南：</strong><br>
+    1. <strong>生成时</strong>务必填写「销售渠道」和「买家备注」，这是关键追溯链<br>
+    2. 每条兑换码记录完整生命周期：谁生成的 → 卖给谁 → 谁用了 → 什么时候用的<br>
+    3. 被举报时，出示：兑换码 + 渠道 + 买家信息 + 使用时间 + 使用者 openid<br>
+    4. 兑换码格式：<strong>前缀-8位随机码</strong>，批次号：<strong>前缀-日期-4位随机码</strong><br>
+    5. 管理密钥默认 <strong>guimiju2026</strong>，可在云函数环境变量 ADMIN_KEY 修改
+  </div>
+
+  <div class="env-info">
+    CloudBase 环境: ai-native-d6gdsx2agc8c46199 · 云函数: handlePayment · 集合: redeem_codes
+  </div>
+</div>
+
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.full.js"></script>
+<script>
+const ENV_ID = 'ai-native-d6gdsx2agc8c46199';
+let app = null;
+
+async function init() {
+  app = cloudbase.init({ env: ENV_ID });
+  const auth = app.auth;
+  try {
+    const { data: session } = await auth.getSession();
+    if (!session || !session.session) {
+      await auth.signInAnonymously();
+    }
+    document.getElementById('gen-status').textContent = '✅ 已连接，可生成兑换码';
+    document.getElementById('gen-status').className = 'status success';
+  } catch (e) {
+    document.getElementById('gen-status').textContent = '⚠️ 连接失败: ' + e.message;
+    document.getElementById('gen-status').className = 'status error';
+  }
+}
+
+// Tab 切换
+function switchTab(name) {
+  document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+  document.querySelectorAll('.tab-content').forEach(c => c.classList.remove('active'));
+  document.querySelector(`.tab[onclick="switchTab('${name}')"]`).classList.add('active');
+  document.getElementById('tab-' + name).classList.add('active');
+}
+
+// ========== 生成 ==========
+async function generate() {
+  const count = parseInt(document.getElementById('gen-count').value) || 10;
+  const prefix = document.getElementById('gen-prefix').value;
+  const channel = document.getElementById('gen-channel').value;
+  const buyerNote = document.getElementById('gen-buyer').value.trim();
+  const adminKey = document.getElementById('gen-key').value;
+  const btn = document.getElementById('btn-gen');
+  const status = document.getElementById('gen-status');
+
+  if (!adminKey) { status.textContent = '请输入管理密钥'; status.className = 'status error'; return; }
+  if (count < 1 || count > 200) { status.textContent = '数量需在 1-200 之间'; status.className = 'status error'; return; }
+
+  btn.disabled = true; btn.textContent = '生成中...';
+  status.textContent = '⏳ 正在生成 ' + count + ' 个兑换码...';
+  status.className = 'status info';
+
+  try {
+    const result = await app.callFunction({
+      name: 'handlePayment',
+      data: { action: 'generateCodes', count, prefix, channel, buyerNote, adminKey }
+    });
+
+    const res = result.result || {};
+    if (res.code === 0 && res.data && res.data.codes) {
+      const { codes, batchId, channel: ch } = res.data;
+      status.innerHTML = `✅ 成功生成 ${codes.length} 个兑换码<br>
+        <span style="font-size:11px;color:#888">批次号: <strong style="color:#d4a853">${batchId}</strong> · 渠道: ${ch} · 买家: ${buyerNote || '未备注'}</span>`;
+      status.className = 'status success';
+
+      // 显示列表
+      const listEl = document.getElementById('code-list');
+      listEl.innerHTML = codes.map(c => `<span class="code-chip">${c}</span>`).join('');
+
+      // 显示文本框
+      const textarea = document.getElementById('code-textarea');
+      textarea.style.display = 'block';
+      textarea.value = codes.join('\n');
+
+      // 复制按钮
+      document.getElementById('btn-copy-all').style.display = '';
+
+      // 自动填充批次号到批次查询
+      document.getElementById('batch-id').value = batchId;
+    } else {
+      status.textContent = '❌ ' + (res.message || '生成失败');
+      status.className = 'status error';
+    }
+  } catch (e) {
+    status.textContent = '❌ 网络错误: ' + e.message;
+    status.className = 'status error';
+  }
+
+  btn.disabled = false; btn.textContent = '生成';
+}
+
+function copyAll() {
+  const textarea = document.getElementById('code-textarea');
+  textarea.select();
+  document.execCommand('copy');
+  const status = document.getElementById('gen-status');
+  const current = status.innerHTML;
+  status.innerHTML = current + '<br><span style="color:#4ade80">📋 已复制到剪贴板！</span>';
+}
+
+// ========== 单码追溯 ==========
+async function queryCode() {
+  const code = document.getElementById('query-code').value.trim().toUpperCase();
+  const status = document.getElementById('query-status');
+  const detail = document.getElementById('query-detail');
+  if (!code) { status.textContent = '请输入兑换码'; status.className = 'status error'; return; }
+
+  status.textContent = '查询中...';
+  status.className = 'status info';
+  detail.innerHTML = '';
+
+  try {
+    const db = app.database();
+    const result = await db.collection('redeem_codes')
+      .where({ code })
+      .limit(1)
+      .get();
+
+    if (result.data && result.data.length > 0) {
+      const c = result.data[0];
+      let stateText = '', stateCls = '';
+      if (c.status === 'active') { stateText = '✅ 有效（未使用）'; stateCls = 'success'; }
+      else if (c.status === 'used') { stateText = '✅ 已使用'; stateCls = 'success'; }
+      else if (c.status === 'disabled') { stateText = '🚫 已禁用'; stateCls = 'error'; }
+
+      status.innerHTML = `<strong>${c.code}</strong> · ${stateText}`;
+      status.className = 'status ' + stateCls;
+
+      detail.innerHTML = `
+        <div class="log-section">
+          <div class="log-entry"><span class="ts">批次号:</span> <span class="code-val">${c.batchId || 'N/A'}</span></div>
+          <div class="log-entry"><span class="ts">销售渠道:</span> <span class="ch-val">${c.channel || 'N/A'}</span></div>
+          <div class="log-entry"><span class="ts">买家备注:</span> ${c.buyerNote || '<span style="color:#f87171">⚠️ 未记录（追溯断链）</span>'}</div>
+          <div class="log-entry"><span class="ts">卖出时间:</span> ${c.soldAt ? new Date(c.soldAt).toLocaleString() : 'N/A'}</div>
+          <div class="log-entry"><span class="ts">创建时间:</span> ${new Date(c.createdAt).toLocaleString()}</div>
+          <div class="log-entry"><span class="ts">创建者:</span> <span class="user-val">${c.createdBy || 'N/A'}</span></div>
+          ${c.status === 'used' ? `
+          <div class="log-entry" style="color:#4ade80"><span class="ts">使用时间:</span> ${new Date(c.usedAt).toLocaleString()}</div>
+          <div class="log-entry"><span class="ts">使用者:</span> <span class="user-val">${c.usedBy || 'N/A'}</span></div>
+          <div class="log-entry"><span class="ts">兑换上下文:</span> ${c.redeemedContext ? JSON.stringify(c.redeemedContext) : 'N/A'}</div>
+          ` : ''}
+        </div>`;
+    } else {
+      status.textContent = '兑换码不存在';
+      status.className = 'status error';
+    }
+  } catch (e) {
+    status.textContent = '查询失败: ' + e.message;
+    status.className = 'status error';
+  }
+}
+
+// ========== 批次查询 ==========
+async function queryBatch() {
+  const batchId = document.getElementById('batch-id').value.trim();
+  const adminKey = document.getElementById('batch-key').value;
+  const status = document.getElementById('batch-status');
+  const detail = document.getElementById('batch-detail');
+
+  if (!batchId) { status.textContent = '请输入批次号'; status.className = 'status error'; return; }
+  if (!adminKey) { status.textContent = '请输入管理密钥'; status.className = 'status error'; return; }
+
+  status.textContent = '查询中...';
+  status.className = 'status info';
+  detail.innerHTML = '';
+
+  try {
+    const result = await app.callFunction({
+      name: 'handlePayment',
+      data: { action: 'queryBatch', batchId, adminKey }
+    });
+
+    const res = result.result || {};
+    if (res.code === 0 && res.data) {
+      const { stats, codes } = res.data;
+      status.innerHTML = `批次 <strong style="color:#d4a853">${batchId}</strong> · 共 ${stats.total} 码`;
+      status.className = 'status success';
+
+      // 统计条
+      let html = `<div class="stat-row">
+        <div class="stat-chip"><div class="num">${stats.total}</div><div class="lbl">总计</div></div>
+        <div class="stat-chip"><div class="num" style="color:#d4a853">${stats.active}</div><div class="lbl">有效</div></div>
+        <div class="stat-chip"><div class="num" style="color:#4ade80">${stats.used}</div><div class="lbl">已用</div></div>
+        <div class="stat-chip"><div class="num" style="color:#f87171">${stats.disabled}</div><div class="lbl">禁用</div></div>
+      </div>`;
+
+      // 渠道/买家摘要
+      if (codes.length > 0) {
+        const first = codes[0];
+        html += `<div style="font-size:12px;color:#888;margin-bottom:8px">
+          渠道: <strong style="color:#d4a853">${first.channel || 'N/A'}</strong> · 
+          买家: <strong style="color:#60a5fa">${first.buyerNote || '⚠️ 未记录'}</strong>
+        </div>`;
+      }
+
+      // 明细表格
+      html += `<div style="overflow-x:auto"><table class="batch-table">
+        <thead><tr>
+          <th>兑换码</th><th>状态</th><th>使用者</th><th>使用时间</th>
+        </tr></thead><tbody>`;
+
+      codes.forEach(c => {
+        const cls = c.status === 'used' ? 'used' : c.status === 'active' ? 'active' : 'disabled';
+        const statusLabel = c.status === 'used' ? '已用' : c.status === 'active' ? '有效' : '禁用';
+        html += `<tr>
+          <td style="color:#d4a853">${c.code}</td>
+          <td class="${cls}">${statusLabel}</td>
+          <td class="user-val">${c.usedBy ? c.usedBy.slice(0, 16) + '...' : '-'}</td>
+          <td style="color:#888">${c.usedAt ? new Date(c.usedAt).toLocaleString() : '-'}</td>
+        </tr>`;
+      });
+
+      html += '</tbody></table></div>';
+      detail.innerHTML = html;
+    } else {
+      status.textContent = '❌ ' + (res.message || '批次不存在');
+      status.className = 'status error';
+    }
+  } catch (e) {
+    status.textContent = '❌ 查询失败: ' + e.message;
+    status.className = 'status error';
+  }
+}
+
+init();
+</script>
+</body>
+</html>

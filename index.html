@@ -1,0 +1,811 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>诡谜局 · AI脑洞推理游戏</title>
+<meta name="description" content="AI脑洞推理游戏。向AI提问「是/否」问题，推理出故事真相。本格推理、细思极恐、叙诡反转，多种类型任你挑战。免费在线玩。">
+<meta name="theme-color" content="#060505">
+<meta name="apple-mobile-web-app-capable" content="yes">
+<meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+<meta name="apple-mobile-web-app-title" content="诡谜局">
+<link rel="manifest" href="manifest.json">
+<link rel="apple-touch-icon" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="192x192" href="icon-192.png">
+<link rel="icon" type="image/png" sizes="512x512" href="icon-512.png">
+<style>
+/* ==== Reset & Variables ==== */
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{
+  /* 核心色调：深靛蓝黑 + 琥珀金 + 暗红 (V2 统一配色) */
+  --bg:#080812;--bg-card:#0d0c18;--bg-input:#12101e;--bg-elevated:#161425;
+  --text:#e8e2d0;--text-dim:#9a9282;--text-muted:#5e574a;
+  --gold:#d4a853;--gold-bright:#f0c860;--gold-dim:#a07830;--gold-glow:rgba(212,168,83,0.25);
+  --crimson:#8b3a4a;--crimson-bright:#c45060;--crimson-glow:rgba(139,58,74,0.3);
+  --indigo:#4a3a6a;--indigo-bright:#6a5a9a;--indigo-dim:#2e2245;
+  --forest:#2a4a3a;--forest-bright:#4a7a5a;
+  --purple:#7a6aaa;--orange:#c08040;--blue:#5a8aaa;--pink:#b07080;
+  --border:#1e1a2a;--border-light:#2e2840;--border-gold:rgba(212,168,83,0.2);
+  /* 卷宗面板色 */
+  --parchment:#e8dcc8;--parchment-dark:#c8b898;--parchment-line:#d0c4a8;
+  --parchment-text:#2a2418;--parchment-text-dim:#6a5e4a;
+  --wax:#8b3a3a;--wax-highlight:#b05040;
+  --radius:14px;--radius-sm:10px;
+  --font:'Noto Serif SC','STSong','SimSun',serif;
+  --ease-out:cubic-bezier(0.16,1,0.3,1);
+  --ease-spring:cubic-bezier(0.34,1.56,0.64,1);
+}
+html,body{height:100%;font-family:var(--font);background:var(--bg);color:var(--text);overflow:hidden;-webkit-font-smoothing:antialiased}
+body{display:flex;justify-content:center;align-items:center;min-height:100dvh;padding:16px;
+  background-image:radial-gradient(ellipse at 30% 20%,rgba(212,168,83,0.03) 0%,transparent 60%),
+    radial-gradient(ellipse at 70% 80%,rgba(139,58,74,0.02) 0%,transparent 50%);}
+
+/* ==== App Shell ==== */
+.app{width:100%;max-width:420px;height:100dvh;max-height:820px;position:relative;overflow:hidden;border-radius:18px;
+  box-shadow:0 0 0 1px var(--border),0 8px 40px rgba(0,0,0,0.7),0 0 80px rgba(212,168,83,0.03);
+  background:var(--bg-card);display:flex;flex-direction:column;}
+/* 暗黑古堡月夜背景 */
+.app::before{content:'';position:absolute;inset:0;border-radius:18px;
+  background:url('bg-main.jpg') center top/cover no-repeat;
+  opacity:0.35;filter:saturate(0.6) brightness(0.5);pointer-events:none;z-index:0;}
+.app::after{content:'';position:absolute;inset:0;border-radius:18px;
+  background:radial-gradient(ellipse at 50% 0%,rgba(212,168,83,0.04) 0%,transparent 50%),
+    radial-gradient(ellipse at 0% 100%,rgba(139,58,74,0.03) 0%,transparent 40%);
+  pointer-events:none;z-index:0;}
+
+/* ==== Screens ==== */
+.screen{position:absolute;inset:0;display:flex;flex-direction:column;z-index:1;
+  transition:opacity .5s var(--ease-out),transform .5s var(--ease-out);
+  overflow-y:auto;padding:28px 22px;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.screen::-webkit-scrollbar{width:3px}
+.screen::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.screen.hidden{opacity:0;pointer-events:none;transform:translateY(16px) scale(0.98)}
+#screen-welcome{justify-content:center;align-items:center;text-align:center;padding:48px 28px}
+#screen-game{padding:20px 18px}
+#screen-result{justify-content:center;align-items:center;text-align:center;padding:48px 28px}
+#screen-guess{background:rgba(0,0,0,0.82);backdrop-filter:blur(8px);-webkit-backdrop-filter:blur(8px);}
+
+/* ==== Ambient BG ==== */
+.ambient{position:fixed;inset:0;pointer-events:none;z-index:0;overflow:hidden;}
+.ambient::before{content:'';position:absolute;top:-40%;left:-30%;width:80%;height:80%;
+  background:radial-gradient(ellipse,rgba(212,168,83,0.03),transparent 65%);
+  animation:ambientFloat 15s ease-in-out infinite;}
+.ambient::after{content:'';position:absolute;bottom:-40%;right:-30%;width:80%;height:80%;
+  background:radial-gradient(ellipse,rgba(139,58,74,0.03),transparent 65%);
+  animation:ambientFloat 18s ease-in-out infinite reverse;}
+#particles{position:fixed;inset:0;pointer-events:none;z-index:0;opacity:0.35;}
+
+/* ==== Welcome ==== */
+.brand-icon{width:100px;height:100px;margin-bottom:12px;display:inline-block;
+  filter:drop-shadow(0 0 24px rgba(212,168,83,0.3));
+  animation:brandFloat 4s var(--ease-out) infinite;}
+.brand-icon img{width:100%;height:100%;object-fit:contain;}
+.brand-logo{width:100px;height:100px;margin-bottom:16px;display:inline-block;
+  filter:drop-shadow(0 0 30px rgba(212,168,83,0.25));
+  animation:brandFloat 4s var(--ease-out) infinite;}
+.brand-logo img{width:100%;height:100%;object-fit:contain;}
+.brand{font-size:40px;font-weight:900;letter-spacing:8px;color:var(--gold);
+  text-shadow:0 0 60px rgba(212,168,83,0.15),0 2px 0 rgba(0,0,0,0.5);line-height:1.1;}
+.brand-sub{color:var(--text-muted);font-size:12px;letter-spacing:6px;margin-top:6px;margin-bottom:36px;text-transform:uppercase;}
+.tagline{font-size:14px;color:var(--text-dim);line-height:2;margin-bottom:44px;max-width:320px;}
+.tagline span{color:var(--text);font-weight:700;
+  background:linear-gradient(180deg,var(--gold-glow),var(--gold));
+  -webkit-background-clip:text;-webkit-text-fill-color:transparent;background-clip:text;}
+
+/* ==== Buttons ==== */
+.btn{display:inline-flex;align-items:center;justify-content:center;gap:6px;
+  padding:14px 52px;border-radius:10px;border:none;
+  font-family:var(--font);font-size:16px;font-weight:600;cursor:pointer;
+  transition:all .25s var(--ease-out);letter-spacing:2px;position:relative;overflow:hidden;}
+.btn::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,255,255,0.06) 0%,transparent 50%);pointer-events:none;}
+.btn-primary{background:linear-gradient(160deg,var(--gold-bright) 0%,var(--gold) 40%,var(--gold-dim) 100%);
+  color:#1a1005;box-shadow:0 4px 20px var(--gold-glow),inset 0 1px 0 rgba(255,255,255,0.2);border-radius:20px;}
+.btn-primary:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(212,168,83,0.35);}
+.btn-primary:active{transform:translateY(0);box-shadow:0 2px 10px var(--gold-glow);}
+.btn-ghost{background:transparent;color:var(--text-dim);border:1px solid var(--border-light);padding:10px 28px;font-size:14px;}
+.btn-ghost:hover{border-color:var(--gold);color:var(--gold);background:rgba(212,168,83,0.04);}
+.btn-sm{padding:10px 24px;font-size:13px;}
+.btn-gold{background:linear-gradient(160deg,var(--gold) 0%,var(--gold-dim) 100%);
+  color:#1a1005;box-shadow:0 4px 20px var(--gold-glow);
+  border:1px solid var(--border-gold);border-radius:20px;}
+.btn-gold:hover{transform:translateY(-2px);box-shadow:0 6px 28px rgba(212,168,83,0.35);}
+.btn-gold:active{transform:translateY(0);}
+.btn:disabled{opacity:0.4;cursor:not-allowed;transform:none!important;box-shadow:none!important;}
+
+/* ==== Stats ==== */
+.stats-row{display:flex;gap:12px;justify-content:center;margin-bottom:32px;width:100%;}
+.stat-item{background:rgba(255,255,255,0.02);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:14px 18px;flex:1;text-align:center;
+  transition:border-color .3s,background .3s;}
+.stat-item:hover{border-color:var(--border-light);background:rgba(255,255,255,0.04);}
+.stat-item .num{font-size:24px;font-weight:800;color:var(--gold);text-shadow:0 0 16px rgba(212,168,83,0.15);}
+.stat-item .lbl{font-size:11px;color:var(--text-muted);margin-top:4px;letter-spacing:1px;}
+
+/* ==== Game Header ==== */
+.game-header{display:flex;justify-content:space-between;align-items:center;
+  padding-bottom:14px;margin-bottom:16px;border-bottom:1px solid var(--border);flex-shrink:0;}
+.game-header .back{background:none;border:none;color:var(--text-muted);font-size:13px;
+  cursor:pointer;padding:6px 10px;font-family:var(--font);transition:color .2s;letter-spacing:1px;}
+.game-header .back:hover{color:var(--text-dim);}
+.game-header .info{font-size:12px;color:var(--text-muted);letter-spacing:0.5px;}
+.game-header .info span{color:var(--gold);font-weight:700;text-shadow:0 0 8px rgba(212,168,83,0.15);}
+
+/* ==== Riddle Card ==== */
+.riddle-card{background:var(--bg-elevated);border:1px solid var(--border);
+  border-radius:var(--radius);padding:22px;margin-bottom:18px;flex-shrink:0;position:relative;overflow:hidden;}
+.riddle-card::before{content:'';position:absolute;top:0;left:0;right:0;height:1px;
+  background:linear-gradient(90deg,transparent,var(--border-gold),transparent);}
+.riddle-type{display:inline-block;font-size:10px;padding:3px 12px;border-radius:20px;
+  margin-bottom:12px;letter-spacing:2px;font-weight:600;text-transform:uppercase;}
+.type-logic{background:rgba(91,155,213,0.1);color:var(--blue);border:1px solid rgba(91,155,213,0.15);}
+.type-twist{background:rgba(232,112,154,0.08);color:var(--pink);border:1px solid rgba(232,112,154,0.12);}
+.type-eerie{background:rgba(224,184,74,0.08);color:var(--gold);border:1px solid rgba(224,184,74,0.12);}
+.type-occult{background:rgba(180,130,200,0.08);color:var(--purple);border:1px solid rgba(180,130,200,0.12);}
+.type-dark{background:rgba(200,70,48,0.1);color:#e74c3c;border:1px solid rgba(200,70,48,0.15);}
+.riddle-title{font-size:19px;font-weight:700;margin-bottom:10px;color:var(--text);line-height:1.5;letter-spacing:0.5px;}
+.riddle-text{font-size:14px;line-height:2;color:var(--text-dim);white-space:pre-wrap;}
+.riddle-hint{font-size:12px;color:var(--gold);margin-top:12px;font-style:italic;opacity:0.65;
+  padding-top:10px;border-top:1px solid rgba(255,255,255,0.03);}
+
+/* ==== Q&A ==== */
+.q-area{flex:1;display:flex;flex-direction:column;min-height:0;}
+.q-history{flex:1;overflow-y:auto;margin-bottom:14px;padding-right:4px;
+  scrollbar-width:thin;scrollbar-color:var(--border) transparent;}
+.q-history::-webkit-scrollbar{width:3px}
+.q-history::-webkit-scrollbar-thumb{background:var(--border);border-radius:2px}
+.q-item{animation:slideUp .35s var(--ease-out);padding:10px 14px;margin-bottom:8px;
+  border-radius:10px;font-size:13px;line-height:1.7;position:relative;}
+.q-item.player-q{background:rgba(255,255,255,0.02);border:1px solid rgba(255,255,255,0.04);}
+.q-item.player-q::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:2px;
+  background:var(--text-muted);border-radius:1px;}
+.q-item.ai-r{background:rgba(212,168,83,0.03);border:1px solid rgba(212,168,83,0.06);
+  cursor:pointer;user-select:none;transition:background .2s;}
+.q-item.ai-r:hover{background:rgba(212,168,83,0.06);}
+.q-item.ai-r::before{content:'';position:absolute;left:0;top:8px;bottom:8px;width:2px;
+  background:var(--gold);border-radius:1px;opacity:0.4;}
+.q-item .label{font-size:10px;color:var(--text-muted);margin-bottom:4px;letter-spacing:1px;text-transform:uppercase;}
+.q-item .summary{display:flex;align-items:center;gap:8px;}
+.q-item .expand-icon{font-size:9px;color:var(--text-muted);
+  transition:transform .25s var(--ease-out);display:inline-block;width:12px;text-align:center;opacity:0.6;}
+.q-item .expand-icon.open{transform:rotate(90deg);opacity:1;}
+.q-item .answer-yes{color:var(--forest-bright);font-weight:700;font-size:14px;}
+.q-item .answer-no{color:var(--crimson-bright);font-weight:700;font-size:14px;}
+.q-item .answer-unrelated{color:var(--gold);font-weight:700;font-size:14px;}
+.q-item .detail{max-height:0;overflow:hidden;transition:max-height .35s var(--ease-out),padding .35s var(--ease-out);
+  padding:0 14px 0 0;font-size:13px;color:var(--text-dim);line-height:1.7;}
+.q-item .detail.open{max-height:300px;padding-top:8px;}
+.q-item .detail .clue-hl{color:#ff5555;font-weight:700;
+  text-shadow:0 0 10px rgba(255,80,80,0.3);border-bottom:1px solid rgba(255,80,80,0.25);padding:0 1px;}
+
+/* ==== Input ==== */
+.q-input-row{display:flex;gap:10px;flex-shrink:0;}
+.q-input-row input{flex:1;padding:12px 16px;border-radius:10px;
+  border:1px solid var(--border);background:var(--bg-input);color:var(--text);
+  font-family:var(--font);font-size:14px;outline:none;transition:border-color .25s,box-shadow .25s;}
+.q-input-row input:focus{border-color:var(--gold);box-shadow:0 0 0 3px rgba(212,168,83,0.08);}
+.q-input-row input::placeholder{color:var(--text-muted);}
+.q-input-row button{padding:12px 20px;border-radius:10px;border:none;
+  background:linear-gradient(160deg,var(--gold-bright),var(--gold));color:#1a1005;
+  font-family:var(--font);font-size:14px;
+  font-weight:600;cursor:pointer;white-space:nowrap;transition:all .2s;letter-spacing:1px;}
+.q-input-row button:hover{box-shadow:0 0 16px rgba(212,168,83,0.2);transform:translateY(-1px);}
+.q-input-row button:disabled{opacity:0.35;cursor:not-allowed;box-shadow:none;transform:none;}
+
+/* ==== Game Actions ==== */
+.game-actions{display:flex;gap:10px;margin-top:14px;flex-shrink:0;}
+.game-actions .btn{flex:1;text-align:center;padding:11px;font-size:13px;}
+
+/* ==== Result Screen ==== */
+.result-icon{font-size:52px;margin-bottom:16px;animation:popIn .5s var(--ease-spring);}
+.result-title{font-size:26px;font-weight:800;margin-bottom:10px;letter-spacing:2px;}
+.result-title.win{color:var(--gold);text-shadow:0 0 32px rgba(212,168,83,0.2);}
+.result-title.lose{color:var(--crimson-bright);}
+.result-answer{background:var(--bg-elevated);border:1px solid var(--border);
+  border-radius:var(--radius);padding:22px;margin:18px 0 28px;text-align:left;width:100%;}
+.result-answer .label{font-size:10px;color:var(--text-muted);margin-bottom:8px;letter-spacing:3px;text-transform:uppercase;}
+.result-answer .text{font-size:15px;line-height:2;color:var(--text);}
+.result-stats{display:flex;gap:10px;margin-bottom:28px;width:100%;justify-content:center;}
+.result-stats .stat-item{padding:12px 14px;}
+.result-actions{display:flex;gap:10px;width:100%;flex-wrap:wrap;}
+.result-actions .btn{flex:1;min-width:120px;}
+
+/* ==== Share Screen ==== */
+#screen-share{background:rgba(0,0,0,0.88);backdrop-filter:blur(14px);-webkit-backdrop-filter:blur(14px);}
+.share-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);
+  padding:32px 26px;text-align:center;max-width:340px;width:100%;margin:auto;
+  position:relative;overflow:hidden;animation:popIn .5s var(--ease-spring);}
+.share-card::before{content:'';position:absolute;top:0;left:15%;right:15%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.share-card .share-icon{font-size:48px;margin-bottom:12px;}
+.share-card .share-brand{font-size:22px;font-weight:900;letter-spacing:6px;color:var(--gold);margin-bottom:6px;}
+.share-card .share-subtitle{font-size:12px;color:var(--text-muted);letter-spacing:3px;margin-bottom:20px;}
+.share-card .share-stats{display:flex;gap:16px;justify-content:center;margin-bottom:22px;}
+.share-card .share-stat{text-align:center;min-width:72px;}
+.share-card .share-stat .val{font-size:30px;font-weight:800;color:var(--gold);
+  text-shadow:0 0 20px rgba(212,168,83,0.2);}
+.share-card .share-stat .lbl{font-size:10px;color:var(--text-muted);margin-top:4px;letter-spacing:1px;}
+.share-card .share-puzzle-name{font-size:14px;color:var(--text);font-weight:600;margin-bottom:8px;}
+.share-card .share-puzzle-preview{font-size:12px;color:var(--text-dim);line-height:1.7;
+  padding:10px 12px;background:rgba(0,0,0,0.25);border-radius:8px;margin-bottom:16px;
+  max-height:60px;overflow:hidden;white-space:nowrap;text-overflow:ellipsis;}
+.share-card .share-tags{font-size:11px;color:var(--text-muted);margin-bottom:20px;letter-spacing:1px;}
+.share-card .share-actions{display:flex;gap:10px;}
+.share-card .share-actions .btn{flex:1;font-size:13px;padding:12px;}
+
+/* ==== Unlock Screen ==== */
+.unlock-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius);
+  padding:32px 26px;max-width:340px;width:100%;text-align:center;position:relative;overflow:hidden;}
+.unlock-card::before{content:'';position:absolute;top:0;left:10%;right:10%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.unlock-card .unlock-icon{font-size:48px;margin-bottom:14px;}
+.unlock-card .unlock-title{font-size:22px;font-weight:800;color:var(--gold);margin-bottom:6px;letter-spacing:2px;}
+.unlock-card .unlock-desc{font-size:13px;color:var(--text-dim);line-height:1.8;margin-bottom:22px;}
+.unlock-card .unlock-desc strong{color:var(--text);}
+.unlock-card .perks{background:rgba(0,0,0,0.2);border:1px solid var(--border);
+  border-radius:var(--radius-sm);padding:18px;margin-bottom:24px;
+  font-size:13px;color:var(--text);line-height:2.4;text-align:left;}
+.unlock-card .perks .perk{display:flex;align-items:flex-start;gap:8px;}
+.unlock-card .perks .perk .emoji{font-size:16px;flex-shrink:0;margin-top:1px;}
+.unlock-card .price-row{font-size:30px;font-weight:800;color:var(--gold);margin-bottom:4px;
+  text-shadow:0 0 24px rgba(212,168,83,0.2);}
+.unlock-card .price-sub{font-size:11px;color:var(--text-muted);margin-bottom:20px;}
+
+/* ==== Unlock Badge ==== */
+.unlock-badge{font-size:12px;padding:8px 18px;border-radius:20px;display:inline-block;font-weight:600;
+  letter-spacing:0.5px;transition:all .3s;}
+.unlock-badge.locked{background:rgba(201,160,74,0.06);color:var(--gold);border:1px solid rgba(201,160,74,0.15);}
+.unlock-badge.unlocked{background:rgba(42,74,58,0.08);color:var(--forest-bright);border:1px solid rgba(42,74,58,0.15);}
+.unlock-status{font-size:13px;min-height:22px;transition:color .3s;}
+.unlock-status.checking{color:var(--gold)}
+.unlock-status.success{color:var(--forest-bright)}
+.unlock-status.error{color:var(--crimson-bright)}
+
+/* ==== Animations ==== */
+@keyframes fadeIn{from{opacity:0;transform:translateY(8px)}to{opacity:1;transform:translateY(0)}}
+@keyframes slideUp{from{opacity:0;transform:translateY(10px) scale(0.97)}to{opacity:1;transform:translateY(0) scale(1)}}
+@keyframes popIn{from{opacity:0;transform:scale(0.9)}to{opacity:1;transform:scale(1)}}
+@keyframes pulse{0%,100%{opacity:0.35}50%{opacity:1}}
+@keyframes brandFloat{0%,100%{transform:translateY(0)}50%{transform:translateY(-8px)}}
+@keyframes ambientFloat{0%,100%{transform:translate(0,0) rotate(0deg)}50%{transform:translate(20px,-10px) rotate(1deg)}}
+@keyframes shimmer{0%{background-position:-200% 0}100%{background-position:200% 0}}
+@keyframes glowPulse{0%,100%{box-shadow:0 0 8px rgba(212,168,83,0.15)}50%{box-shadow:0 0 20px rgba(212,168,83,0.3)}}
+
+/* ==== Typing Indicator ==== */
+.typing-indicator{display:flex;gap:5px;padding:10px 14px;align-items:center;}
+.typing-indicator span{width:6px;height:6px;border-radius:50%;background:var(--gold);animation:pulse 1.2s infinite;}
+.typing-indicator span:nth-child(2){animation-delay:.2s}
+.typing-indicator span:nth-child(3){animation-delay:.4s}
+
+/* ==== Misc ==== */
+.screen>*{position:relative;z-index:1}
+.empty-qa{flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;
+  color:var(--text-muted);font-size:13px;text-align:center;gap:10px;}
+.empty-qa .icon{font-size:36px;opacity:0.2;}
+.empty-qa p{line-height:1.8;}
+.divider{width:40px;height:1px;background:var(--border-light);margin:20px auto;}
+.toast{position:fixed;bottom:30px;left:50%;transform:translateX(-50%) translateY(100px);
+  background:var(--bg-elevated);border:1px solid var(--border);border-radius:10px;
+  padding:12px 24px;color:var(--text);font-size:13px;z-index:100;
+  transition:transform .35s var(--ease-spring);pointer-events:none;
+  box-shadow:0 8px 24px rgba(0,0,0,0.5);max-width:90vw;text-align:center;}
+.toast.show{transform:translateX(-50%) translateY(0);}
+.toast.success{border-color:var(--forest-bright);}
+.toast.error{border-color:var(--crimson-bright);}
+.toast.info{border-color:var(--gold);color:var(--gold);white-space:pre-line;}
+
+/* ==== Guess Modal ==== */
+#screen-guess>div{animation:popIn .35s var(--ease-spring);}
+
+/* ==== Responsive ==== */
+@media(max-width:380px){
+  body{padding:8px}
+  .app{border-radius:12px;max-height:100dvh;}
+  .screen{padding:20px 14px}
+  #screen-welcome{padding:32px 20px}
+  .brand{font-size:32px;letter-spacing:4px;}
+  .brand-icon{font-size:44px;}
+}
+
+/* ==== Desktop: 宽屏适配 ==== */
+@media(min-width:768px){
+  body{padding:24px}
+  .app{max-width:440px;max-height:900px;border-radius:22px;}
+  /* 桌面两侧装饰 */
+  .desktop-side{display:flex!important;}
+}
+.desktop-side{display:none;position:fixed;top:50%;transform:translateY(-50%);
+  flex-direction:column;gap:16px;z-index:0;pointer-events:none;}
+.desktop-side.left{left:max(24px,calc((100vw - 440px) / 2 - 200px))}
+.desktop-side.right{right:max(24px,calc((100vw - 440px) / 2 - 200px))}
+.desktop-side .side-text{font-family:var(--font);font-size:12px;color:var(--text-muted);
+  writing-mode:vertical-rl;letter-spacing:4px;opacity:0.35;line-height:2;
+  text-shadow:0 0 12px rgba(212,168,83,0.06);}
+.desktop-side .side-symbol{font-size:28px;opacity:0.15;text-align:center;
+  animation:brandFloat 6s ease-in-out infinite;}
+
+/* ==== 分类筛选 ==== */
+.filter-row{display:flex;gap:8px;justify-content:center;margin-bottom:20px;flex-wrap:wrap;}
+.filter-chip{padding:6px 16px;border-radius:20px;font-size:11px;font-family:var(--font);
+  cursor:pointer;letter-spacing:1px;transition:all .25s var(--ease-out);
+  background:transparent;color:var(--text-muted);border:1px solid var(--border);}
+.filter-chip:hover{border-color:var(--text-dim);color:var(--text-dim);}
+.filter-chip.active{border-color:var(--gold);color:var(--gold);background:rgba(212,168,83,0.06);}
+.filter-chip.all.active{border-color:var(--gold);color:var(--gold);background:rgba(224,184,74,0.06);}
+.filter-chip.type-logic.active{border-color:var(--blue);color:var(--blue);background:rgba(91,155,213,0.06);}
+.filter-chip.type-twist.active{border-color:var(--pink);color:var(--pink);background:rgba(232,112,154,0.06);}
+.filter-chip.type-eerie.active{border-color:var(--gold);color:var(--gold);background:rgba(224,184,74,0.06);}
+.filter-chip.type-occult.active{border-color:var(--purple);color:var(--purple);background:rgba(180,130,200,0.06);}
+.filter-chip.type-dark.active{border-color:#e74c3c;color:#e74c3c;background:rgba(200,70,48,0.06);}
+
+/* ==== 新手引导 ==== */
+.tutorial-overlay{position:fixed;inset:0;z-index:200;background:rgba(0,0,0,0.88);
+  display:flex;justify-content:center;align-items:center;padding:24px;
+  animation:fadeIn .3s ease-out;}
+.tutorial-card{background:var(--bg-elevated);border:1px solid var(--border);
+  border-radius:var(--radius);padding:32px 26px;max-width:360px;width:100%;
+  text-align:center;position:relative;overflow:hidden;
+  animation:popIn .4s var(--ease-spring);}
+.tutorial-card::before{content:'';position:absolute;top:0;left:15%;right:15%;height:1px;
+  background:linear-gradient(90deg,transparent,var(--gold),transparent);}
+.tutorial-card .tut-step{display:none;flex-direction:column;align-items:center;gap:14px;}
+.tutorial-card .tut-step.active{display:flex;}
+.tutorial-card .tut-icon{font-size:40px;margin-bottom:4px;}
+.tutorial-card .tut-title{font-size:18px;font-weight:700;color:var(--text);letter-spacing:1px;}
+.tutorial-card .tut-desc{font-size:13px;color:var(--text-dim);line-height:1.9;max-width:280px;}
+.tutorial-card .tut-desc strong{color:var(--gold);}
+.tutorial-card .tut-dots{display:flex;gap:8px;margin:6px 0;}
+.tutorial-card .tut-dot{width:6px;height:6px;border-radius:50%;background:var(--border);transition:all .3s;}
+.tutorial-card .tut-dot.active{background:var(--gold);box-shadow:0 0 8px rgba(201,160,74,0.3);}
+.tutorial-card .tut-actions{display:flex;gap:10px;width:100%;}
+.tutorial-card .tut-actions .btn{flex:1;font-size:13px;padding:12px;}
+
+/* ==== Login UI ==== */
+.login-row{display:flex;align-items:center;justify-content:center;gap:8px;}
+.login-status{font-size:11px;color:var(--text-muted);}
+.login-status.logged{color:var(--forest-bright);}
+.login-status.gm{color:var(--gold);font-weight:700;}
+
+.modal-overlay{position:fixed;inset:0;z-index:100;display:flex;align-items:center;justify-content:center;
+  background:rgba(0,0,0,0.7);backdrop-filter:blur(4px);-webkit-backdrop-filter:blur(4px);}
+.modal-overlay.hidden{display:none;}
+.modal-box{background:var(--bg-card);border:1px solid var(--border);border-radius:var(--radius);
+  padding:24px;width:90%;max-width:340px;box-shadow:0 8px 40px rgba(0,0,0,0.6);}
+.modal-title{font-size:16px;font-weight:700;color:var(--text);margin-bottom:16px;text-align:center;}
+.modal-body{font-size:13px;color:var(--text-dim);}
+.modal-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:16px;}
+.modal-actions .btn{font-size:12px;padding:8px 16px;}
+.form-group{margin-bottom:12px;}
+.form-group label{font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;}
+.form-group input{width:100%;box-sizing:border-box;background:var(--bg-input);border:1px solid var(--border);
+  color:var(--text);padding:10px 12px;border-radius:8px;font-family:var(--font);font-size:14px;outline:none;
+  transition:border-color .2s;}
+.form-group input:focus{border-color:var(--gold);}
+.form-error{color:var(--crimson-bright);font-size:12px;min-height:18px;margin-top:4px;}
+.btn-danger{background:linear-gradient(160deg,var(--crimson-bright),var(--crimson));color:#f0d0c0;
+  border:none;padding:8px 16px;border-radius:var(--radius-sm);
+  font-family:var(--font);font-size:12px;cursor:pointer;transition:all .2s;}
+.btn-danger:hover{opacity:0.85;box-shadow:0 4px 16px var(--crimson-glow);}
+.btn-xs{padding:4px 12px!important;font-size:11px!important;}
+.btn-xs:disabled{opacity:0.4;cursor:not-allowed;}
+
+/* ==== 验证码 & 条款 ==== */
+.code-row{display:flex;gap:8px;align-items:center;}
+.code-tip{font-size:10px;color:var(--text-muted);margin-top:4px;min-height:14px;}
+.terms-row{margin-top:8px;}
+.terms-label{display:flex;align-items:flex-start;gap:6px;cursor:pointer;font-size:11px;color:var(--text-muted);line-height:1.6;}
+.terms-label input[type="checkbox"]{margin-top:3px;accent-color:var(--gold);}
+.terms-label a{color:var(--gold);text-decoration:underline;text-underline-offset:2px;}
+.terms-label a:hover{color:var(--gold-bright);}
+
+/* ==== 页脚 ==== */
+.footer-links{text-align:center;margin-top:20px;padding-top:12px;border-top:1px solid rgba(255,255,255,0.04);}
+.footer-links a{font-size:10px;color:var(--text-muted);text-decoration:none;letter-spacing:0.5px;transition:color .2s;}
+.footer-links a:hover{color:var(--gold);}
+.footer-divider{font-size:10px;color:var(--text-muted);margin:0 6px;opacity:0.4;}
+.footer-copy{font-size:10px;color:var(--text-muted);opacity:0.5;}
+
+/* ==== V2 预览入口 ==== */
+.btn-v2-preview{display:inline-flex;align-items:center;gap:6px;
+  padding:10px 20px;border-radius:20px;border:1px solid rgba(212,168,83,0.2);
+  background:rgba(212,168,83,0.05);color:var(--gold);
+  font-family:var(--font);font-size:12px;font-weight:600;cursor:pointer;
+  letter-spacing:1px;transition:all .25s var(--ease-out);
+  text-shadow:0 0 8px rgba(212,168,83,0.15);}
+.btn-v2-preview:hover{border-color:rgba(212,168,83,0.4);background:rgba(212,168,83,0.1);
+  box-shadow:0 0 20px rgba(212,168,83,0.1);transform:translateY(-1px);}
+.btn-v2-preview .badge-dev{font-size:10px;padding:2px 8px;border-radius:10px;
+  background:rgba(139,58,74,0.15);color:var(--crimson-bright,#c45060);
+  border:1px solid rgba(139,58,74,0.2);animation:pulse 2s infinite;}
+</style>
+</head>
+<body>
+<canvas id="particles"></canvas>
+
+<!-- 桌面两侧装饰 -->
+<div class="desktop-side left">
+  <div class="side-symbol">🔍</div>
+  <div class="side-text">诡·谜·局</div>
+  <div class="side-symbol">🧩</div>
+  <div class="side-text">脑洞推理游戏</div>
+</div>
+<div class="desktop-side right">
+  <div class="side-symbol">🤖</div>
+  <div class="side-text">AI·主·持·推·理</div>
+  <div class="side-symbol">💡</div>
+  <div class="side-text">向AI提问吧</div>
+</div>
+
+<div class="app">
+<div class="ambient"></div>
+
+<!-- ====== WELCOME ====== -->
+<div id="screen-welcome" class="screen">
+  <div class="brand-logo"><img src="guimiju-logo-v4.jpg" alt="诡谜局" onerror="this.parentElement.style.display='none'"></div>
+  <div class="brand">诡谜局</div>
+  <div class="brand-sub">— AI 脑洞推理游戏 —</div>
+  <div class="tagline">每局一个精心设计的推理谜题<br>向 AI 提问 <span>将会得到「是 / 否 / 无关」</span><br>运用逻辑，揭开真相</div>
+  <div class="login-row" id="login-row" style="margin-bottom:12px;">
+    <button class="btn btn-ghost btn-xs" id="btn-v1-login" onclick="showLoginModal()" style="font-size:11px;padding:4px 14px;">🔑 登录</button>
+    <span class="login-status" id="v1-login-status">未登录</span>
+  </div>
+  <div class="stats-row">
+    <div class="stat-item"><div class="num" id="total-puzzles">60</div><div class="lbl">谜题库</div></div>
+    <div class="stat-item"><div class="num" id="best-score">—</div><div class="lbl">最少提问</div></div>
+  </div>
+  <div class="filter-row" id="filter-row">
+    <div class="filter-chip all active" onclick="filterPuzzles('all')">全部</div>
+    <div class="filter-chip type-logic" onclick="filterPuzzles('logic')">🔍 本格推理</div>
+    <div class="filter-chip type-twist" onclick="filterPuzzles('twist')">🌀 叙诡反转</div>
+    <div class="filter-chip type-eerie" onclick="filterPuzzles('eerie')">🌙 细思极恐</div>
+    <div class="filter-chip type-occult" onclick="filterPuzzles('occult')">👻 变格悬疑</div>
+    <div class="filter-chip type-dark" onclick="filterPuzzles('dark')">🖤 暗黑重口</div>
+  </div>
+  <div class="unlock-badge locked" id="unlock-badge" style="margin-bottom:20px">🔑 输入兑换码解锁全部谜题</div>
+  <button class="btn btn-primary" onclick="startGame()">开始猜谜</button>
+  <button class="btn btn-gold btn-sm" onclick="showGenScreen()" style="margin-top:12px;font-size:13px;padding:10px 24px">🤖 AI定制谜题</button>
+  <div style="display:flex;gap:10px;justify-content:center;margin-top:10px;flex-wrap:wrap">
+    <button class="btn btn-ghost btn-sm" onclick="toggleSound()" id="btn-sound" style="font-size:12px;padding:8px 16px">🔊 音效</button>
+    <button class="btn btn-ghost btn-sm" onclick="showDailyPuzzle()" id="btn-daily" style="font-size:12px;padding:8px 16px">📅 每日一题</button>
+  </div>
+  <div style="margin-top:16px;border-top:1px solid var(--border);padding-top:16px">
+    <button class="btn btn-ghost btn-sm" onclick="showRedeemModal()" style="font-size:12px;padding:8px 16px">🎫 兑换码</button>
+    <button class="btn-v2-preview" onclick="showV2Preview()">👥 多人联机 <span class="badge-dev">DEV</span></button>
+  </div>
+  <div class="footer-links">
+    <a href="javascript:void(0)" onclick="showTerms('privacy')">隐私政策</a>
+    <span class="footer-divider">|</span>
+    <a href="javascript:void(0)" onclick="showTerms('service')">服务协议</a>
+    <span class="footer-divider">|</span>
+    <span class="footer-copy">© 2026 诡谜局</span>
+  </div>
+</div>
+
+<!-- ====== GAME ====== -->
+<div id="screen-game" class="screen hidden">
+  <div class="game-header">
+    <button class="back" onclick="confirmQuit()">← 退出</button>
+    <div class="info">提问 <span id="q-count">0</span> · <span id="puzzle-num">1</span>/90</div>
+  </div>
+  <div class="riddle-card">
+    <div class="riddle-type" id="riddle-type"></div>
+    <div class="riddle-title" id="riddle-title"></div>
+    <div class="riddle-text" id="riddle-text"></div>
+    <div class="riddle-hint" id="riddle-hint"></div>
+  </div>
+  <div class="q-area">
+    <div class="q-history" id="q-history">
+      <div class="empty-qa"><div class="icon">🕸️</div><p>向 AI 提问<br>点开回答查看线索</p></div>
+    </div>
+    <div class="q-input-row">
+      <input type="text" id="q-input" placeholder="输入你的问题…" autocomplete="off">
+      <button id="q-submit" onclick="askQuestion()">提问</button>
+    </div>
+    <div class="game-actions">
+      <button class="btn btn-gold btn-sm" onclick="showGuessModal()">🔮 猜答案</button>
+      <button class="btn btn-ghost btn-sm" onclick="shareCurrentPuzzle()">📤 分享</button>
+      <button class="btn btn-ghost btn-sm" onclick="giveUp()">放弃</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== RESULT ====== -->
+<div id="screen-result" class="screen hidden">
+  <div class="result-icon" id="result-icon">💀</div>
+  <div class="result-title" id="result-title">真相是…</div>
+  <div class="result-answer">
+    <div class="label">— 汤底 —</div>
+    <div class="text" id="result-text"></div>
+  </div>
+  <div class="result-stats">
+    <div class="stat-item"><div class="num" id="result-questions">0</div><div class="lbl">提问次数</div></div>
+    <div class="stat-item"><div class="num" id="result-score">—</div><div class="lbl">评分</div></div>
+  </div>
+  <div class="result-actions">
+    <button class="btn btn-primary btn-sm" onclick="nextPuzzle()">下一题 →</button>
+    <button class="btn btn-gold btn-sm" onclick="showShareCard()" id="btn-share-result">📤 分享战绩</button>
+    <button class="btn btn-ghost btn-sm" onclick="backToMenu()">返回首页</button>
+  </div>
+</div>
+
+<!-- ====== SHARE CARD ====== -->
+<div id="screen-share" class="screen hidden" onclick="hideShareCard(event)">
+  <div class="share-card" id="share-card-inner">
+    <div class="share-icon" id="share-icon">🏆</div>
+    <div class="share-brand">诡谜局</div>
+    <div class="share-subtitle">AI 脑洞推理游戏</div>
+    <div class="share-stats">
+      <div class="share-stat"><div class="val" id="share-questions">0</div><div class="lbl">提问次数</div></div>
+      <div class="share-stat"><div class="val" id="share-grade">S</div><div class="lbl">评分</div></div>
+    </div>
+    <div class="share-puzzle-name" id="share-title"></div>
+    <div class="share-puzzle-preview" id="share-preview"></div>
+    <div class="share-tags">#诡谜局 #AI推理 #脑洞游戏</div>
+    <div class="share-actions">
+      <button class="btn btn-gold btn-sm" onclick="copyShareCard();event.stopPropagation();">📋 复制文案</button>
+      <button class="btn btn-ghost btn-sm" onclick="hideShareCard();event.stopPropagation();">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== GUESS MODAL ====== -->
+<div id="screen-guess" class="screen hidden">
+  <div style="flex:1;display:flex;flex-direction:column;justify-content:center;align-items:center;text-align:center">
+    <div style="font-size:42px;margin-bottom:16px">🔮</div>
+    <div style="font-size:18px;font-weight:700;margin-bottom:20px">输入你的答案</div>
+    <textarea id="guess-input" style="width:100%;max-width:320px;height:100px;padding:14px;border-radius:10px;border:1px solid var(--border);background:var(--bg-input);color:var(--text);font-family:var(--font);font-size:14px;resize:none;outline:none;margin-bottom:20px" placeholder="汤底是什么？&#10;用一两句话写出你的答案…"></textarea>
+    <div class="result-actions" style="max-width:320px">
+      <button class="btn btn-gold btn-sm" onclick="submitGuess()">提交答案</button>
+      <button class="btn btn-ghost btn-sm" onclick="closeGuessModal()">再想想</button>
+    </div>
+  </div>
+</div>
+
+
+
+
+<!-- ====== AI 定制谜题 ====== -->
+<div id="screen-gen" class="screen hidden" style="justify-content:center;align-items:center;padding:28px">
+  <div style="width:100%;max-width:420px">
+    <div style="text-align:center;margin-bottom:24px">
+      <div style="font-size:48px;margin-bottom:8px">🤖</div>
+      <h2 style="color:var(--gold);margin:0 0 8px">AI 定制谜题</h2>
+      <p style="color:var(--text-muted);font-size:13px;margin:0">输入关键词，AI 为你量身打造专属推理谜题</p>
+    </div>
+
+    <div style="background:rgba(0,0,0,0.35);border-radius:12px;padding:20px;margin-bottom:16px">
+      <label style="color:var(--text-secondary);font-size:13px;display:block;margin-bottom:6px">📝 关键词</label>
+      <input id="gen-keywords" placeholder="例如：电梯、镜子、医院、双胞胎..." style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.08);border:1px solid var(--border-color);border-radius:8px;padding:12px;color:var(--text-primary);font-size:14px;margin-bottom:14px">
+
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px">
+        <div>
+          <label style="color:var(--text-secondary);font-size:12px;display:block;margin-bottom:4px">类型</label>
+          <select id="gen-type" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.08);border:1px solid var(--border-color);border-radius:8px;padding:10px;color:var(--text-primary);font-size:13px">
+            <option value="classic">经典海龟汤</option>
+            <option value="folk">民俗怪谈</option>
+            <option value="dream">梦核迷境</option>
+            <option value="cthulhu">克苏鲁异兆</option>
+            <option value="scary">恐怖惊悚</option>
+          </select>
+        </div>
+        <div>
+          <label style="color:var(--text-secondary);font-size:12px;display:block;margin-bottom:4px">风格</label>
+          <select id="gen-style" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.08);border:1px solid var(--border-color);border-radius:8px;padding:10px;color:var(--text-primary);font-size:13px">
+            <option value="twist">细思极恐反转</option>
+            <option value="sad">悲伤温情</option>
+            <option value="scary">血腥惊悚</option>
+            <option value="weird">荒诞变格</option>
+          </select>
+        </div>
+      </div>
+      <div style="margin-top:10px">
+        <label style="color:var(--text-secondary);font-size:12px;display:block;margin-bottom:4px">难度</label>
+        <select id="gen-difficulty" style="width:100%;box-sizing:border-box;background:rgba(255,255,255,0.08);border:1px solid var(--border-color);border-radius:8px;padding:10px;color:var(--text-primary);font-size:13px">
+          <option value="easy">简单 · 新手友好</option>
+          <option value="medium" selected>中等 · 需要思考</option>
+          <option value="hard">困难 · 烧脑推理</option>
+        </select>
+      </div>
+    </div>
+
+    <button class="btn btn-gold" id="btn-gen-submit" onclick="doGenPuzzle()" style="width:100%;margin-bottom:10px">🤖 开始生成</button>
+    <button class="btn btn-ghost btn-sm" onclick="backToMenuFromGen()" style="width:100%">返回菜单</button>
+    <div id="gen-status" style="text-align:center;margin-top:12px;font-size:13px;color:var(--text-muted)"></div>
+    <p style="text-align:center;margin-top:16px;font-size:11px;color:var(--text-muted);opacity:0.6">💡 提示：输入关键词，AI 为你打造专属谜题</p>
+  </div>
+</div>
+
+</div>
+
+<!-- ====== V1 登录 Modal ====== -->
+<div class="modal-overlay hidden" id="modal-v1-login" onclick="if(event.target===this)hideLoginModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">🔐 登录账号</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>邮箱 / 用户名</label>
+        <input id="v1-login-username" placeholder="输入邮箱或用户名">
+      </div>
+      <div class="form-group">
+        <label>密码</label>
+        <input id="v1-login-password" type="password" placeholder="输入密码" onkeydown="if(event.key==='Enter')handleLogin()">
+      </div>
+      <div class="form-error" id="v1-login-error"></div>
+      <div style="text-align:right;margin-top:4px">
+        <a href="javascript:void(0)" onclick="showResetPwdModal()" style="font-size:11px;color:var(--text-muted);text-decoration:underline;text-underline-offset:2px">忘记密码？</a>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="showRegisterModal()">注册</button>
+      <button class="btn btn-ghost btn-sm" onclick="hideLoginModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="btn-v1-login-submit" onclick="handleLogin()">登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== V1 注册 Modal ====== -->
+<div class="modal-overlay hidden" id="modal-v1-register" onclick="if(event.target===this)this.classList.add('hidden')">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">📝 注册新账号</div>
+    <div class="modal-body">
+      <div class="form-group">
+        <label>邮箱（用于注册和登录）</label>
+        <div class="code-row">
+          <input id="v1-register-email" type="email" placeholder="输入邮箱" style="flex:1">
+          <button class="btn btn-ghost btn-xs" id="btn-v1-send-code" onclick="handleSendVerifyCode()" style="flex-shrink:0;white-space:nowrap">发送验证码</button>
+        </div>
+        <div class="code-tip" id="v1-code-tip"></div>
+      </div>
+      <div class="form-group">
+        <label>用户名（3-20位）</label>
+        <input id="v1-register-username" placeholder="输入用户名">
+      </div>
+      <div class="form-group">
+        <label>密码（6位以上）</label>
+        <input id="v1-register-password" type="password" placeholder="输入密码" onkeydown="if(event.key==='Enter')handleSignUp()">
+      </div>
+      <div class="form-group">
+        <label>邮箱验证码</label>
+        <input id="v1-register-code" placeholder="输入6位验证码" maxlength="6">
+      </div>
+      <div class="form-error" id="v1-register-error"></div>
+      <div class="terms-row">
+        <label class="terms-label">
+          <input type="checkbox" id="v1-register-agree" onchange="updateRegisterBtn()">
+          <span>我已阅读并同意 <a href="javascript:void(0)" onclick="showTerms('privacy')">《隐私政策》</a> 和 <a href="javascript:void(0)" onclick="showTerms('service')">《服务协议》</a></span>
+        </label>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="document.getElementById('modal-v1-register').classList.add('hidden')">取消</button>
+      <button class="btn btn-primary btn-sm" id="btn-v1-register-submit" onclick="handleSignUp()" disabled>注册并登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== V1 重置密码 Modal ====== -->
+<div class="modal-overlay hidden" id="modal-v1-resetpwd" onclick="if(event.target===this)hideResetPwdModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">🔑 重置密码</div>
+    <div class="modal-body">
+      <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">输入注册时使用的邮箱，我们将发送重置密码链接。</p>
+      <div class="form-group">
+        <label>邮箱</label>
+        <input id="v1-resetpwd-email" type="email" placeholder="输入注册邮箱">
+      </div>
+      <div class="form-error" id="v1-resetpwd-error"></div>
+      <div class="form-success" id="v1-resetpwd-success" style="display:none;color:#4ade80;font-size:12px;margin-top:4px"></div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="showLoginModal()">返回登录</button>
+      <button class="btn btn-ghost btn-sm" onclick="hideResetPwdModal()">取消</button>
+      <button class="btn btn-primary btn-sm" id="btn-v1-resetpwd-submit" onclick="handleResetPassword()">发送重置邮件</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== V1 账号信息 Modal ====== -->
+<div class="modal-overlay hidden" id="modal-v1-account" onclick="if(event.target===this)hideAccountModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">👤 账号信息</div>
+    <div class="modal-body" style="text-align:center">
+      <div style="font-size:32px;margin-bottom:8px">🕵️</div>
+      <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px" id="v1-account-name">玩家</div>
+      <div style="font-size:11px;color:var(--text-dim);margin-bottom:4px" id="v1-account-type">登录方式：匿名</div>
+      <div style="font-size:10px;color:var(--text-muted);margin-bottom:12px" id="v1-account-id">UID: -</div>
+      <div id="v1-gm-info" style="display:none;background:rgba(224,184,74,0.08);border:1px solid var(--gold);border-radius:8px;padding:8px;margin-bottom:10px;font-size:12px;color:var(--gold)">
+        ⭐ 内测管理员 · 全部谜题免费
+      </div>
+      <div style="font-size:11px;color:var(--text-muted);line-height:1.6">
+        注册账号后，解锁进度将永久保存。<br>即使更换设备也能恢复。
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="hideAccountModal()">关闭</button>
+      <button class="btn btn-danger btn-sm" id="btn-v1-logout" style="display:none" onclick="handleLogout()">退出登录</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 兑换码 Modal ====== -->
+<div class="modal-overlay hidden" id="modal-redeem" onclick="if(event.target===this)hideRedeemModal()">
+  <div class="modal-box" onclick="event.stopPropagation()">
+    <div class="modal-title">🎫 兑换码</div>
+    <div class="modal-body" style="text-align:center">
+      <div style="font-size:40px;margin-bottom:12px">🎁</div>
+      <p style="font-size:13px;color:var(--text-dim);line-height:1.8;margin-bottom:16px">
+        输入兑换码即可<strong style="color:var(--gold)">解锁全部谜题</strong><br>
+        兑换码永久有效，绑定当前账号
+      </p>
+      <div class="form-group">
+        <input id="redeem-code-input" placeholder="输入兑换码" style="text-align:center;text-transform:uppercase;letter-spacing:2px;font-size:16px" maxlength="16" onkeydown="if(event.key==='Enter')handleRedeem()">
+      </div>
+      <div class="form-error" id="redeem-error"></div>
+      <div id="redeem-success" style="display:none;color:#4ade80;font-size:13px;margin-top:4px"></div>
+      <div style="margin-top:16px;padding-top:12px;border-top:1px solid var(--border)">
+        <p style="font-size:11px;color:var(--text-muted);line-height:1.8">
+          💬 购买兑换码请加微信<br>
+          <strong style="color:var(--gold);font-size:13px" id="wechat-id">WeChat: guimiju_tanzhang</strong>
+        </p>
+        <p style="font-size:10px;color:var(--text-muted);margin-top:4px;opacity:0.6">
+          也欢迎反馈建议 · 许愿新谜题类型
+        </p>
+      </div>
+    </div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="hideRedeemModal()">关闭</button>
+      <button class="btn btn-primary btn-sm" id="btn-redeem-submit" onclick="handleRedeem()">兑换</button>
+    </div>
+  </div>
+</div>
+
+<!-- ====== 隐私政策 / 服务协议 Modal ====== -->
+<div class="modal-overlay hidden" id="modal-terms" onclick="if(event.target===this)hideTermsModal()">
+  <div class="modal-box" onclick="event.stopPropagation()" style="max-height:70vh;overflow-y:auto">
+    <div class="modal-title" id="terms-title">隐私政策</div>
+    <div class="modal-body" id="terms-body" style="font-size:12px;line-height:2;color:var(--text-dim)"></div>
+    <div class="modal-actions">
+      <button class="btn btn-ghost btn-sm" onclick="hideTermsModal()">关闭</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast -->
+<div class="toast" id="toast"></div>
+
+<!-- 新手引导 -->
+<div class="tutorial-overlay" id="tutorial" style="display:none">
+  <div class="tutorial-card">
+    <div class="tut-step active" data-step="0">
+      <div class="tut-icon">🔍</div>
+      <div class="tut-title">欢迎来到诡谜局</div>
+      <div class="tut-desc">每局一个<strong>推理谜题</strong><br>你只知道表面现象<br>真相等待你去发现…</div>
+      <div class="tut-dots"><div class="tut-dot active"></div><div class="tut-dot"></div><div class="tut-dot"></div></div>
+      <div class="tut-actions"><button class="btn btn-primary btn-sm" onclick="tutorialNext()">知道了 →</button></div>
+    </div>
+    <div class="tut-step" data-step="1">
+      <div class="tut-icon">🤖</div>
+      <div class="tut-title">向 AI 提问</div>
+      <div class="tut-desc">输入<strong>是/否问题</strong>向 AI 提问<br>AI 会回答 <strong style="color:var(--forest-bright)">「是」</strong>、<strong style="color:var(--crimson-bright)">「否」</strong> 或 <strong style="color:var(--gold)">「无关」</strong><br>并附带<strong>线索提示</strong></div>
+      <div class="tut-dots"><div class="tut-dot"></div><div class="tut-dot active"></div><div class="tut-dot"></div></div>
+      <div class="tut-actions"><button class="btn btn-primary btn-sm" onclick="tutorialNext()">明白了 →</button></div>
+    </div>
+    <div class="tut-step" data-step="2">
+      <div class="tut-icon">🔮</div>
+      <div class="tut-title">猜出真相</div>
+      <div class="tut-desc">积累线索后，点击<strong style="color:var(--gold)">「猜答案」</strong><br>输入你推理出的真相<br>提问次数越少，评分越高！</div>
+      <div class="tut-dots"><div class="tut-dot"></div><div class="tut-dot"></div><div class="tut-dot active"></div></div>
+      <div class="tut-actions">
+        <button class="btn btn-gold btn-sm" onclick="tutorialFinish()">开始挑战！</button>
+        <button class="btn btn-ghost btn-sm" onclick="tutorialSkip()">跳过</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.full.js"></script>
+<script src="puzzles.js"></script>
+<script src="game.js"></script>
+</body>
+</html>

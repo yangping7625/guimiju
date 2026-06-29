@@ -1,0 +1,12 @@
+node_modules/
+.env
+*.log
+cloudfunctions/
+cloudrun/
+v2-frontend/
+v2-modules/
+v2-preview-server.js
+server.js
+.codebuddy/
+gh-pages/
+*.md

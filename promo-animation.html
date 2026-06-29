@@ -1,0 +1,552 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<title>诡谜局 · 皮探长 V1 宣传动画</title>
+<style>
+*{margin:0;padding:0;box-sizing:border-box}
+body{background:#000;display:flex;flex-direction:column;align-items:center;justify-content:center;min-height:100vh;font-family:'Noto Sans CJK SC','Microsoft YaHei',sans-serif;overflow:hidden}
+canvas{max-width:100vw;max-height:85vh;border-radius:8px;box-shadow:0 0 40px rgba(212,168,83,0.15)}
+.controls{margin-top:12px;display:flex;gap:12px;align-items:center}
+.controls button{padding:8px 20px;border:1px solid rgba(212,168,83,0.3);background:rgba(212,168,83,0.1);color:#d4a853;border-radius:6px;cursor:pointer;font-size:14px;transition:all .2s}
+.controls button:hover{background:rgba(212,168,83,0.2);border-color:rgba(212,168,83,0.5)}
+.controls span{color:#8a7e6e;font-size:12px}
+</style>
+</head>
+<body>
+<canvas id="c" width="1080" height="1920"></canvas>
+<div class="controls">
+  <button onclick="replay()">▶ 重新播放</button>
+  <button onclick="record()">📹 录制导出</button>
+  <span>V1 纯宣传 · 1080×1920 竖版 · 35秒</span>
+</div>
+
+<script>
+// ================================================================
+// 诡谜局 · 皮探长 V1 宣传动画（纯 V1 内容，不泄露 V2）
+// 分镜: Logo → 皮探长登场 → 四步玩法 → V2预告 → CTA
+// ================================================================
+
+const C = document.getElementById('c');
+const ctx = C.getContext('2d');
+const W = 1080, H = 1920;
+
+// ---- 素材（全部在 assets/ 下，无 V2 内容） ----
+const ASSETS = {
+  logo:      'assets/guimiju-logo-v4.jpg',
+  piMain:    'assets/pi-detective-v1.jpg',
+  piEmotions:'assets/pi-detective-emotions.jpg',
+  piScene:   'assets/pi-detective-scene.jpg',
+};
+
+// ---- 图片加载 ----
+const images = {};
+function loadAll() {
+  return Promise.all(Object.entries(ASSETS).map(([key, src]) => {
+    return new Promise(r => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => { images[key] = img; r(); };
+      img.onerror = () => { images[key] = null; r(); };
+      img.src = src;
+    });
+  }));
+}
+
+// ---- 工具函数 ----
+let startTime = 0, animId = null;
+const TOTAL_S = 35;
+
+function easeOut(t) { return 1 - Math.pow(1-t, 3); }
+function easeInOut(t) { return t<.5 ? 4*t*t*t : 1-Math.pow(-2*t+2,3)/2; }
+function clamp01(v) { return Math.max(0, Math.min(1, v)); }
+function delay(t, start) { return clamp01((t - start) / 0.8) * easeOut(clamp01((t-start)/0.8)); }
+
+function roundRect(x,y,w,h,r) {
+  ctx.beginPath();
+  ctx.moveTo(x+r,y); ctx.lineTo(x+w-r,y); ctx.quadraticCurveTo(x+w,y,x+w,y+r);
+  ctx.lineTo(x+w,y+h-r); ctx.quadraticCurveTo(x+w,y+h,x+w-r,y+h);
+  ctx.lineTo(x+r,y+h); ctx.quadraticCurveTo(x,y+h,x,y+h-r);
+  ctx.lineTo(x,y+r); ctx.quadraticCurveTo(x,y,x+r,y);
+  ctx.closePath();
+}
+
+function drawImg(img, x, y, w, h, r) {
+  if (!img) return;
+  ctx.save();
+  if (r) { roundRect(x,y,w,h,r); ctx.clip(); }
+  const ir = img.width/img.height, br = w/h;
+  let sx=0,sy=0,sw=img.width,sh=img.height;
+  if (ir>br) { sw=img.height*br; sx=(img.width-sw)/2; }
+  else { sh=img.width/br; sy=(img.height-sh)/2; }
+  ctx.drawImage(img, sx,sy,sw,sh, x,y,w,h);
+  ctx.restore();
+}
+
+// ---- 粒子 ----
+const particles = [];
+function initParticles(n) {
+  particles.length = 0;
+  for (let i=0; i<n; i++) particles.push({
+    x:Math.random()*W, y:Math.random()*H,
+    r:Math.random()*2.5+0.8,
+    vx:(Math.random()-.5)*.4, vy:-Math.random()*1.2-.3,
+    c:['212,168,83','140,90,200','60,180,130'][Math.floor(Math.random()*3)],
+    a:Math.random()*.5+.15, life:Math.random()
+  });
+}
+function drawParticles() {
+  particles.forEach(p => {
+    p.x+=p.vx; p.y+=p.vy; p.life+=.005;
+    if (p.life>1) { p.life=0; p.x=Math.random()*W; p.y=H+10; }
+    const a = p.a*(1-p.life);
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.c},${a})`; ctx.fill();
+    ctx.beginPath(); ctx.arc(p.x,p.y,p.r*3,0,Math.PI*2);
+    ctx.fillStyle=`rgba(${p.c},${a*0.12})`; ctx.fill();
+  });
+}
+
+// ---- 对话气泡 ----
+function drawBubble(text, x, y, w, alpha) {
+  ctx.save();
+  ctx.globalAlpha = alpha;
+  ctx.font = 'bold 38px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  const lines = [];
+  const maxChars = Math.floor(w / 38);
+  for (let i=0; i<text.length; i+=maxChars) lines.push(text.slice(i, i+maxChars));
+  const lineH = 50, pad = 28;
+  const bh = lines.length * lineH + pad * 2;
+  // 气泡背景
+  ctx.fillStyle = 'rgba(232,226,208,0.92)';
+  roundRect(x, y, w, bh, 20); ctx.fill();
+  // 左三角
+  ctx.beginPath();
+  ctx.moveTo(x+30, y+bh);
+  ctx.lineTo(x+5, y+bh+28);
+  ctx.lineTo(x+70, y+bh);
+  ctx.fill();
+  // 文字
+  ctx.fillStyle = '#2a2520';
+  ctx.textAlign = 'left';
+  lines.forEach((line, i) => {
+    ctx.fillText(line, x+pad, y+pad+38+i*lineH);
+  });
+  ctx.restore();
+}
+
+// ---- 暗色背景 ----
+function drawDarkBg(t, color1, color2) {
+  const grad = ctx.createLinearGradient(0,0,0,H);
+  grad.addColorStop(0, color1 || '#050510');
+  grad.addColorStop(1, color2 || '#0a0818');
+  ctx.fillStyle = grad;
+  ctx.fillRect(0,0,W,H);
+}
+
+// ---- 暗角 ----
+function drawVignette() {
+  const v = ctx.createRadialGradient(W/2,H/2,H*.3,W/2,H/2,H*.75);
+  v.addColorStop(0,'transparent');
+  v.addColorStop(1,'rgba(0,0,0,0.45)');
+  ctx.fillStyle = v;
+  ctx.fillRect(0,0,W,H);
+}
+
+// ================================================================
+// Scene 1: Logo 片头（0-4s）
+// ================================================================
+function scene1(t) {
+  drawDarkBg(t, '#050510', '#0a0818');
+  drawParticles();
+
+  // Logo 放大淡入
+  const fadeIn = easeOut(clamp01(t / 1.5));
+  const scale = .6 + fadeIn * .4;
+  ctx.save();
+  ctx.globalAlpha = fadeIn;
+  ctx.translate(W/2, H*.32);
+  ctx.scale(scale, scale);
+  ctx.translate(-W/2, -H*.32);
+  if (images.logo) drawImg(images.logo, W*.18, H*.12, W*.64, W*.64, 40);
+  ctx.restore();
+
+  // 副标题
+  const subIn = easeOut(clamp01((t-1.8)/1));
+  ctx.save();
+  ctx.globalAlpha = subIn;
+  ctx.textAlign = 'center';
+  // 主标语
+  ctx.font = 'bold 52px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.fillStyle = '#d4a853';
+  ctx.shadowColor = 'rgba(212,168,83,0.3)';
+  ctx.shadowBlur = 25;
+  ctx.fillText('AI 海龟汤 · 推理游戏', W/2, H*.7);
+  ctx.shadowBlur = 0;
+  // 副标语
+  ctx.font = '32px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.fillStyle = '#9a9282';
+  ctx.fillText('每个谜题，都藏着一个不为人知的真相', W/2, H*.76);
+  ctx.restore();
+}
+
+// ================================================================
+// Scene 2: 皮探长登场（4-11s）
+// ================================================================
+function scene2(t) {
+  const st = t - 4;
+  drawDarkBg(t, '#060612', '#0c0a1a');
+  drawParticles();
+
+  // 皮探长从左下角滑入（白底抠图效果——用圆角矩形框模拟）
+  const slideIn = easeOut(clamp01(st / 1.2));
+  const piX = -300 + slideIn * 100;
+  const piY = H - 350;
+  ctx.save();
+  ctx.globalAlpha = slideIn;
+  if (images.piMain) {
+    // 绘制皮探长（白底图，加个暗色圆形底衬让白底不那么突兀）
+    ctx.fillStyle = 'rgba(15,12,25,0.7)';
+    ctx.beginPath(); ctx.arc(piX+180, piY+220, 200, 0, Math.PI*2); ctx.fill();
+    drawImg(images.piMain, piX, piY-20, 360, 480, 30);
+  }
+  ctx.restore();
+
+  // 对话气泡依次出现
+  const b1 = delay(st, 1.2);
+  const b2 = delay(st, 2.5);
+  const b3 = delay(st, 3.8);
+
+  drawBubble('我是皮探长 🕵️', 80, H*.12, W*0.55, b1);
+  drawBubble('欢迎来到诡谜局！', 80, H*.25, W*0.55, b2);
+  drawBubble('在这里，你只需要做一件事——', 80, H*.38, W*0.55, b3);
+
+  // 底部装饰线
+  const lineIn = easeOut(clamp01((st-5)/0.8));
+  ctx.save();
+  ctx.globalAlpha = lineIn * 0.2;
+  ctx.strokeStyle = '#d4a853';
+  ctx.lineWidth = 1;
+  ctx.beginPath(); ctx.moveTo(80, H*.55); ctx.lineTo(W-80, H*.55); ctx.stroke();
+  ctx.restore();
+}
+
+// ================================================================
+// Scene 3: 四步玩法展示（11-24s）
+// ================================================================
+function scene3(t) {
+  const st = t - 11;
+  drawDarkBg(t, '#080614', '#0e0c20');
+  drawParticles();
+
+  const steps = [
+    { emoji:'📖', title:'阅读谜题', desc:'细思极恐的海龟汤故事\n暗藏关键线索…', color:'#d4a853',
+      emotionSrc:'piEmotions', ex:0, ey:0, ew:.5, eh:.5 },
+    { emoji:'❓', title:'向 AI 提问', desc:'只能问"是"或"不是"\nAI 会给你关键回复', color:'#5aaa5a',
+      emotionSrc:'piEmotions', ex:.5, ey:0, ew:.5, eh:.5 },
+    { emoji:'🔍', title:'收集线索', desc:'每个回答都藏着【线索词】\n拼凑出真相的碎片', color:'#5a9ada',
+      emotionSrc:'piEmotions', ex:0, ey:.5, ew:.5, eh:.5 },
+    { emoji:'💡', title:'推理真相', desc:'大胆猜测谜底！\n你能率先揭开真相吗？', color:'#c45050',
+      emotionSrc:'piEmotions', ex:.5, ey:.5, ew:.5, eh:.5 }
+  ];
+
+  const stepH = 350, stepGap = 40, startY = 100;
+
+  steps.forEach((s, i) => {
+    const stepStart = i * 1.4;
+    const stepT = easeOut(clamp01((st - stepStart) / 0.9));
+    if (stepT <= 0) return;
+
+    const cy = startY + i * (stepH + stepGap);
+    const slideX = W + stepT * (-W - 120);
+
+    ctx.save();
+    ctx.globalAlpha = stepT;
+    ctx.translate(slideX, 0);
+
+    // 卡片背景
+    ctx.fillStyle = 'rgba(18,16,30,0.88)';
+    roundRect(60, cy, W-120, stepH, 20); ctx.fill();
+    // 左侧色条
+    ctx.fillStyle = s.color;
+    roundRect(60, cy, 8, stepH, 20); ctx.fill();
+    // 色条发光
+    const glow = ctx.createLinearGradient(60, cy, 100, cy);
+    glow.addColorStop(0, s.color + '20');
+    glow.addColorStop(1, 'transparent');
+    ctx.fillStyle = glow;
+    ctx.fillRect(68, cy, 40, stepH);
+
+    // Emoji
+    ctx.font = '72px serif';
+    ctx.textAlign = 'center';
+    ctx.fillText(s.emoji, 160, cy + 150);
+
+    // 皮探长小表情（从表情包裁切区域绘制）
+    if (images.piEmotions && stepT > 0.5) {
+      const emoAlpha = (stepT - 0.5) * 2;
+      ctx.globalAlpha = stepT * emoAlpha * 0.85;
+      const srcX = s.ex * images.piEmotions.width;
+      const srcY = s.ey * images.piEmotions.height;
+      const srcW = s.ew * images.piEmotions.width;
+      const srcH = s.eh * images.piEmotions.height;
+      // 绘制表情包的一个象限作为小头像
+      try {
+        ctx.drawImage(images.piEmotions, srcX+10, srcY+10, srcW-20, srcH-20,
+          W-230, cy+50, 130, 130);
+      } catch(e) {}
+      ctx.globalAlpha = stepT;
+    }
+
+    // 标题
+    ctx.font = 'bold 48px "Noto Sans CJK SC","Microsoft YaHei",serif';
+    ctx.textAlign = 'left';
+    ctx.fillStyle = '#e8e2d0';
+    ctx.fillText(s.title, 240, cy + 100);
+
+    // 描述
+    ctx.font = '30px "Noto Sans CJK SC","Microsoft YaHei",serif';
+    ctx.fillStyle = '#9a9282';
+    s.desc.split('\n').forEach((line, li) => {
+      ctx.fillText(line, 240, cy + 155 + li * 45);
+    });
+
+    // 步骤编号
+    ctx.font = 'bold 22px "Noto Sans CJK SC","Microsoft YaHei",serif';
+    ctx.fillStyle = s.color;
+    ctx.textAlign = 'right';
+    ctx.fillText(`STEP ${i+1}`, W - 100, cy + 45);
+
+    ctx.restore();
+  });
+
+  // 底部提示
+  const hintA = easeOut(clamp01((st-5.6)/0.6)) * (.5 + Math.sin(st*3)*.3);
+  ctx.save();
+  ctx.globalAlpha = hintA;
+  ctx.font = '28px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#8a7e6e';
+  ctx.fillText('↓', W/2, H - 40);
+  ctx.restore();
+}
+
+// ================================================================
+// Scene 4: V2 小预告（24-30s）
+// ================================================================
+function scene4(t) {
+  const st = t - 24;
+
+  // 画面逐渐变暗变神秘
+  drawDarkBg(t, '#04030a', '#080612');
+  drawParticles();
+
+  // 神秘雾气效果
+  const fogA = clamp01(st / 1) * 0.3;
+  const fogGrad = ctx.createRadialGradient(W/2, H*.4, 100, W/2, H*.4, H*.5);
+  fogGrad.addColorStop(0, `rgba(100,60,160,${fogA})`);
+  fogGrad.addColorStop(0.5, `rgba(40,100,120,${fogA*0.5})`);
+  fogGrad.addColorStop(1, 'transparent');
+  ctx.fillStyle = fogGrad;
+  ctx.fillRect(0, 0, W, H);
+
+  // 皮探长神秘表情（表情包左下 = 怀疑）
+  const piIn = easeOut(clamp01(st / 1.2));
+  ctx.save();
+  ctx.globalAlpha = piIn;
+  if (images.piEmotions) {
+    // 裁切左下角（怀疑表情）
+    const srcX = 0, srcY = images.piEmotions.height * 0.5;
+    const srcW = images.piEmotions.width * 0.5;
+    const srcH = images.piEmotions.height * 0.5;
+    // 暗色底衬
+    ctx.fillStyle = 'rgba(15,12,25,0.6)';
+    ctx.beginPath(); ctx.arc(W/2, H*.28, 160, 0, Math.PI*2); ctx.fill();
+    try {
+      ctx.drawImage(images.piEmotions, srcX+20, srcY+20, srcW-40, srcH-40,
+        W/2-150, H*.15, 300, 300);
+    } catch(e) {}
+  }
+  ctx.restore();
+
+  // 文字依次出现
+  const line1 = easeOut(clamp01((st-1)/0.7));
+  const line2 = easeOut(clamp01((st-1.8)/0.7));
+  const line3 = easeOut(clamp01((st-2.6)/0.7));
+
+  ctx.save();
+  ctx.textAlign = 'center';
+
+  ctx.globalAlpha = line1;
+  ctx.font = 'bold 44px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.fillStyle = '#b088e0';
+  ctx.fillText('还有更多精彩…', W/2, H*.52);
+
+  ctx.globalAlpha = line2;
+  ctx.font = 'bold 40px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.fillStyle = '#e8e2d0';
+  ctx.fillText('🎭 多人联机 · 角色收集 · 主题皮肤', W/2, H*.59);
+
+  ctx.globalAlpha = line3;
+  ctx.font = '34px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  const blink = 0.4 + Math.sin(st * 4) * 0.6;
+  ctx.fillStyle = `rgba(160,140,200,${line3 * blink})`;
+  ctx.fillText('V2 正在制作中，敬请期待', W/2, H*.66);
+
+  ctx.restore();
+
+  // 底部省略号动画
+  const dots = '···';
+  ctx.save();
+  ctx.globalAlpha = line3 * (0.3 + Math.sin(st*2)*0.3);
+  ctx.font = '30px serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#8a7e6e';
+  ctx.fillText(dots, W/2, H*.72);
+  ctx.restore();
+}
+
+// ================================================================
+// Scene 5: 片尾 CTA（30-35s）
+// ================================================================
+function scene5(t) {
+  const st = t - 30;
+  drawDarkBg(t, '#050510', '#0a0818');
+  drawParticles();
+
+  // Logo 淡入
+  const logoIn = easeOut(clamp01(st / 1));
+  ctx.save();
+  ctx.globalAlpha = logoIn;
+  if (images.logo) drawImg(images.logo, W*.25, H*.1, W*.5, W*.5, 36);
+  ctx.restore();
+
+  // 皮探长挥手告别（表情包右下）
+  const piIn = easeOut(clamp01((st-0.5)/0.8));
+  ctx.save();
+  ctx.globalAlpha = piIn;
+  if (images.piEmotions) {
+    const srcX = images.piEmotions.width * 0.5;
+    const srcY = images.piEmotions.height * 0.5;
+    const srcW = images.piEmotions.width * 0.5;
+    const srcH = images.piEmotions.height * 0.5;
+    ctx.fillStyle = 'rgba(15,12,25,0.5)';
+    ctx.beginPath(); ctx.arc(W*.82, H*.52, 80, 0, Math.PI*2); ctx.fill();
+    try {
+      ctx.drawImage(images.piEmotions, srcX+15, srcY+15, srcW-30, srcH-30,
+        W*.82-80, H*.52-80, 160, 160);
+    } catch(e) {}
+  }
+  ctx.restore();
+
+  // 游戏名
+  const nameIn = easeOut(clamp01((st-1)/0.7));
+  ctx.save();
+  ctx.globalAlpha = nameIn;
+  ctx.textAlign = 'center';
+  ctx.font = 'bold 56px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.fillStyle = '#d4a853';
+  ctx.shadowColor = 'rgba(212,168,83,0.3)';
+  ctx.shadowBlur = 20;
+  ctx.fillText('诡谜局', W/2, H*.68);
+  ctx.shadowBlur = 0;
+  ctx.font = '30px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.fillStyle = '#9a9282';
+  ctx.fillText('— 皮探长', W/2, H*.73);
+  ctx.restore();
+
+  // CTA 按钮
+  const ctaIn = easeOut(clamp01((st-1.5)/0.7));
+  const pulse = 0.6 + Math.sin(st*2.5)*0.4;
+  ctx.save();
+  ctx.globalAlpha = ctaIn;
+  const btnW = W*0.7, btnH = 100, btnX = (W-btnW)/2, btnY = H*.78;
+  ctx.shadowColor = `rgba(212,168,83,${pulse*0.5})`;
+  ctx.shadowBlur = 30;
+  ctx.fillStyle = '#d4a853';
+  roundRect(btnX, btnY, btnW, btnH, 50); ctx.fill();
+  ctx.shadowBlur = 0;
+  ctx.font = 'bold 40px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#1a1510';
+  ctx.fillText('🔍 立即开始推理', W/2, btnY + 66);
+  ctx.restore();
+
+  // 链接
+  const linkIn = easeOut(clamp01((st-2)/0.7));
+  ctx.save();
+  ctx.globalAlpha = linkIn;
+  ctx.font = '26px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = '#6a6050';
+  ctx.fillText('ai-native-d6gdsx2agc8c46199-1448179936.tcloudbaseapp.com', W/2, H*.88);
+  ctx.restore();
+
+  // 版权
+  ctx.font = '20px "Noto Sans CJK SC","Microsoft YaHei",serif';
+  ctx.textAlign = 'center';
+  ctx.fillStyle = 'rgba(138,126,110,0.4)';
+  ctx.fillText('© 2026 诡谜局 · AI海龟汤推理', W/2, H - 30);
+}
+
+// ================================================================
+// 主循环
+// ================================================================
+function render(timestamp) {
+  if (!startTime) startTime = timestamp;
+  const t = ((timestamp - startTime) / 1000) % TOTAL_S;
+
+  ctx.clearRect(0,0,W,H);
+
+  if (t < 4) scene1(t);
+  else if (t < 11) scene2(t);
+  else if (t < 24) scene3(t);
+  else if (t < 30) scene4(t);
+  else scene5(t);
+
+  drawVignette();
+  animId = requestAnimationFrame(render);
+}
+
+// ---- 控制 ----
+function replay() {
+  if (animId) cancelAnimationFrame(animId);
+  startTime = 0;
+  initParticles(45);
+  animId = requestAnimationFrame(render);
+}
+
+function record() {
+  const stream = C.captureStream(30);
+  const recorder = new MediaRecorder(stream, { mimeType: 'video/webm; codecs=vp9', videoBitsPerSecond: 8000000 });
+  const chunks = [];
+  recorder.ondataavailable = e => chunks.push(e.data);
+  recorder.onstop = () => {
+    const blob = new Blob(chunks, { type: 'video/webm' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = '诡谜局-皮探长宣传.webm';
+    document.body.appendChild(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 60000);
+  };
+  recorder.start();
+  replay(); // 重头开始录
+  setTimeout(() => recorder.stop(), TOTAL_S * 1000 + 500);
+  // 用 toast 代替 alert
+  const toast = document.createElement('div');
+  toast.textContent = '📹 正在录制 35 秒…完成后自动下载';
+  toast.style.cssText = 'position:fixed;top:20px;left:50%;transform:translateX(-50%);background:rgba(212,168,83,0.9);color:#1a1510;padding:12px 24px;border-radius:8px;font-size:14px;z-index:999';
+  document.body.appendChild(toast);
+  setTimeout(() => toast.remove(), TOTAL_S * 1000 + 1000);
+}
+
+// ---- 启动 ----
+async function init() {
+  await loadAll();
+  initParticles(45);
+  animId = requestAnimationFrame(render);
+}
+init();
+</script>
+</body>
+</html>
