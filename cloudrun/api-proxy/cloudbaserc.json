@@ -1,0 +1,6 @@
+{
+  "envId": "ai-native-d6gdsx2agc8c46199",
+  "cloudrun": {
+    "name": "api-proxy"
+  }
+}
