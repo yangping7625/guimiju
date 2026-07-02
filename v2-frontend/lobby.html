@@ -1,0 +1,1470 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>诡谜局 · 多人推理</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Serif+SC:wght@400;600;700;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="v2-style.css?v=3">
+<style>
+/* ==== Lobby Specific ==== */
+.lobby-hero{text-align:center;padding:24px 18px 16px;position:relative;z-index:1;}
+.lobby-hero .brand{font-size:32px;font-weight:900;letter-spacing:6px;color:var(--gold);
+  text-shadow:0 0 30px rgba(212,168,83,0.15),0 2px 0 rgba(0,0,0,0.5);line-height:1.2;}
+.lobby-hero .brand-sub{color:var(--text-muted);font-size:11px;letter-spacing:4px;margin-top:4px;}
+
+/* Action Cards */
+.action-cards{display:grid;grid-template-columns:1fr 1fr;gap:10px;margin:0 18px 16px;position:relative;z-index:1;}
+.action-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:18px 14px;text-align:center;cursor:pointer;transition:all .25s var(--ease-out);
+  position:relative;overflow:hidden;}
+.action-card::after{content:'';position:absolute;inset:0;
+  background:linear-gradient(180deg,rgba(255,255,255,0.03) 0%,transparent 50%);pointer-events:none;}
+.action-card:hover{border-color:var(--border-light);transform:translateY(-2px);
+  box-shadow:0 4px 16px rgba(0,0,0,0.3);}
+.action-card:active{transform:translateY(0);box-shadow:none;}
+.action-card .icon{font-size:28px;margin-bottom:8px;display:block;}
+.action-card .label{font-size:13px;font-weight:600;color:var(--text);letter-spacing:1px;}
+
+/* Mode Selector */
+.mode-section{margin:0 18px 16px;position:relative;z-index:1;}
+.mode-section .title{font-size:12px;color:var(--text-muted);letter-spacing:2px;margin-bottom:10px;text-transform:uppercase;}
+.mode-grid{display:grid;grid-template-columns:1fr 1fr;gap:8px;}
+.mode-card{background:var(--bg-input);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px;cursor:pointer;transition:all .2s;text-align:center;}
+.mode-card:hover{border-color:var(--gold);background:rgba(212,168,83,0.04);}
+.mode-card.selected{border-color:var(--gold);background:rgba(212,168,83,0.08);
+  box-shadow:0 0 0 1px var(--gold);}
+.mode-card .mode-icon{font-size:22px;margin-bottom:4px;}
+.mode-card .mode-name{font-size:12px;font-weight:600;color:var(--text);margin-bottom:2px;}
+.mode-card .mode-desc{font-size:10px;color:var(--text-muted);line-height:1.5;}
+
+/* Room Code Input */
+.join-section{margin:0 18px 16px;position:relative;z-index:1;}
+.join-row{display:flex;gap:8px;}
+.join-row input{flex:1;text-transform:uppercase;text-align:center;letter-spacing:4px;font-size:18px;font-weight:700;}
+.join-row .btn{flex-shrink:0;padding:12px 20px;}
+
+/* Online Players */
+.online-bar{margin:0 18px 16px;display:flex;align-items:center;gap:8px;font-size:12px;color:var(--text-muted);position:relative;z-index:1;}
+.online-dot{width:6px;height:6px;border-radius:50%;background:var(--green);
+  box-shadow:0 0 6px rgba(78,205,196,0.5);animation:pulse 2s infinite;}
+
+/* Recent Rooms / Public Rooms / Puzzle Browser */
+.recent-section{margin:0 18px 20px;position:relative;z-index:1;}
+.recent-section .title{font-size:12px;color:var(--text-muted);letter-spacing:2px;margin-bottom:10px;
+  text-transform:uppercase;display:flex;align-items:center;gap:8px;}
+.recent-item{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px 14px;margin-bottom:8px;display:flex;align-items:center;justify-content:space-between;
+  cursor:pointer;transition:all .2s;}
+.recent-item:hover{border-color:var(--border-light);background:rgba(255,255,255,0.02);}
+.recent-item .room-info{display:flex;align-items:center;gap:10px;}
+.recent-item .room-code{font-size:14px;font-weight:700;color:var(--gold);letter-spacing:2px;}
+.recent-item .room-meta{font-size:11px;color:var(--text-muted);}
+.recent-item .room-status{font-size:11px;padding:3px 8px;border-radius:12px;}
+.room-status.waiting{background:rgba(212,168,83,0.1);color:var(--gold);}
+.room-status.playing{background:rgba(139,58,74,0.1);color:var(--crimson-bright);}
+
+/* Public Room Card */
+.public-room-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:12px 14px;margin-bottom:8px;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:12px;}
+.public-room-card:hover{border-color:var(--gold);background:rgba(212,168,83,0.04);
+  box-shadow:0 2px 12px rgba(0,0,0,0.2);}
+.public-room-card .room-left{flex:1;min-width:0;}
+.public-room-card .room-code-line{font-size:14px;font-weight:700;color:var(--gold);letter-spacing:2px;margin-bottom:2px;}
+.public-room-card .room-title-line{font-size:12px;color:var(--text-dim);margin-bottom:3px;
+  white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.public-room-card .room-meta-line{font-size:10px;color:var(--text-muted);display:flex;align-items:center;gap:6px;}
+.public-room-card .room-right{text-align:right;flex-shrink:0;}
+.public-room-card .room-players{font-size:16px;font-weight:700;color:var(--text);}
+.public-room-card .room-mode-tag{font-size:10px;padding:2px 8px;border-radius:10px;
+  background:rgba(212,168,83,0.1);color:var(--gold);margin-top:4px;}
+.public-room-card .room-avatars{display:flex;gap:2px;margin-top:4px;justify-content:flex-end;}
+.public-room-card .room-avatar{width:18px;height:18px;border-radius:50%;background:var(--bg-input);
+  display:flex;align-items:center;justify-content:center;font-size:10px;}
+
+/* Puzzle Card */
+.puzzle-type-btn{background:var(--bg-input);border:1px solid var(--border);color:var(--text-dim);
+  padding:4px 10px;border-radius:12px;font-size:11px;cursor:pointer;transition:all .2s;
+  font-family:var(--font);}
+.puzzle-type-btn:hover{border-color:var(--border-light);color:var(--text);}
+.puzzle-type-btn.selected{background:rgba(212,168,83,0.12);border-color:var(--gold);color:var(--gold);}
+.puzzle-card{background:var(--bg-elevated);border:1px solid var(--border);border-radius:var(--radius-sm);
+  padding:10px 14px;margin-bottom:6px;cursor:pointer;transition:all .2s;
+  display:flex;align-items:center;gap:10px;}
+.puzzle-card:hover{border-color:var(--gold);background:rgba(212,168,83,0.03);}
+.puzzle-card .puzzle-stars{color:var(--gold);font-size:11px;letter-spacing:1px;flex-shrink:0;}
+.puzzle-card .puzzle-info{flex:1;min-width:0;}
+.puzzle-card .puzzle-title{font-size:13px;font-weight:600;color:var(--text);margin-bottom:1px;}
+.puzzle-card .puzzle-preview{font-size:10px;color:var(--text-muted);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;}
+.puzzle-card .puzzle-meta{font-size:10px;color:var(--text-dim);display:flex;align-items:center;gap:6px;}
+.puzzle-card .puzzle-type-tag{padding:1px 6px;border-radius:8px;font-size:9px;background:rgba(255,255,255,0.05);}
+.puzzle-card .btn-enter{flex-shrink:0;padding:5px 12px;font-size:11px;border-radius:10px;
+  background:var(--gold);color:#1a1005;border:none;cursor:pointer;font-weight:600;
+  font-family:var(--font);transition:all .2s;}
+.puzzle-card .btn-enter:hover{opacity:0.85;transform:scale(1.05);}
+
+/* Name Edit Modal */
+.name-modal .modal-body{display:flex;flex-direction:column;gap:12px;align-items:center;}
+.name-modal input{width:100%;text-align:center;font-size:16px;font-weight:600;}
+.name-hint{font-size:11px;color:var(--text-muted);}
+
+/* Game Config Modal */
+.config-modal .config-row{display:flex;justify-content:space-between;align-items:center;
+  padding:10px 0;border-bottom:1px solid var(--border);}
+.config-modal .config-row:last-child{border:none;}
+.config-modal .config-label{font-size:13px;color:var(--text-dim);}
+.config-modal .config-value{display:flex;align-items:center;gap:8px;}
+.config-modal .config-value select{background:var(--bg-input);border:1px solid var(--border);
+  color:var(--text);padding:6px 10px;border-radius:8px;font-family:var(--font);font-size:13px;
+  outline:none;cursor:pointer;}
+.player-stepper{display:flex;align-items:center;gap:8px;}
+.player-stepper .step-btn{width:28px;height:28px;border-radius:8px;border:1px solid var(--border);
+  background:var(--bg-input);color:var(--text);font-size:16px;cursor:pointer;display:flex;
+  align-items:center;justify-content:center;transition:all .2s;font-family:var(--font);}
+.player-stepper .step-btn:hover{border-color:var(--gold);color:var(--gold);}
+.player-stepper .step-btn:active{transform:scale(0.9);}
+.player-stepper .count{font-size:16px;font-weight:700;min-width:20px;text-align:center;color:var(--gold);}
+
+/* Welcome Modal */
+.welcome-modal .modal-body{display:flex;flex-direction:column;gap:14px;align-items:center;}
+.welcome-sub{font-size:13px;color:var(--text-dim);text-align:center;letter-spacing:1px;}
+.welcome-modal input{width:100%;text-align:center;font-size:16px;font-weight:600;}
+.gender-select{display:flex;gap:14px;justify-content:center;}
+.gender-btn{width:100px;padding:16px 12px;border-radius:var(--radius);
+  background:var(--bg-input);border:2px solid var(--border);cursor:pointer;
+  transition:all .25s var(--ease-out);text-align:center;}
+.gender-btn:hover{border-color:var(--border-light);background:rgba(255,255,255,0.02);}
+.gender-btn.selected{border-color:var(--gold);background:rgba(212,168,83,0.06);
+  box-shadow:0 0 16px var(--gold-glow);}
+.gender-icon{font-size:32px;margin-bottom:6px;}
+.gender-label{font-size:13px;font-weight:600;color:var(--text);letter-spacing:1px;}
+/* Login Modal */
+.login-modal .modal-body input{background:var(--bg-input);border:1px solid var(--border);
+  color:var(--text);padding:10px 12px;border-radius:8px;font-family:var(--font);font-size:14px;
+  outline:none;transition:border-color .2s;}
+.login-modal .modal-body input:focus{border-color:var(--gold);}
+.login-modal .btn-danger{background:var(--crimson-bright);color:#fff;border:none;padding:10px 20px;
+  border-radius:var(--radius-sm);font-family:var(--font);font-size:13px;cursor:pointer;transition:opacity .2s;}
+.login-modal .btn-danger:hover{opacity:0.85;}
+</style>
+</head>
+<body>
+
+<div class="ambient"></div>
+
+<div class="app" id="app">
+  <!-- Particle Canvas -->
+  <canvas id="particles-canvas"></canvas>
+  <!-- Header -->
+  <header class="app-header">
+    <div class="title"><span class="icon">🕯️</span> 诡谜局</div>
+    <div class="actions">
+      <button class="header-btn" id="btn-login" title="登录账号">🔑</button>
+      <button class="header-btn" id="btn-edit-name" title="修改昵称">✏️</button>
+    </div>
+  </header>
+
+  <!-- User Bar -->
+  <div class="user-bar">
+    <div class="user-avatar" id="user-avatar">🕵️</div>
+    <div class="user-info">
+      <div class="user-name" id="user-name">玩家 <span id="gm-badge" style="display:none;background:var(--gold);color:#1a1005;font-size:10px;padding:1px 6px;border-radius:8px;margin-left:6px;vertical-align:middle;">GM</span></div>
+      <div class="user-id" id="user-subtitle">多人推理模式</div>
+    </div>
+  </div>
+
+  <!-- Page: Lobby -->
+  <div class="page" id="page-lobby">
+    <div class="page-content">
+      <!-- Hero -->
+      <div class="lobby-hero">
+        <img id="lobby-hero-img" src="../assets/pi-detective-v1.png" alt="皮探长" style="width:80px;height:80px;object-fit:cover;border-radius:14px;margin-bottom:10px;border:2px solid var(--border-gold);box-shadow:0 0 18px var(--gold-glow);">
+        <div class="brand">诡谜局</div>
+        <div class="brand-sub">AI 海龟汤 · 多人推理</div>
+      </div>
+
+      <!-- Online Count -->
+      <div class="online-bar">
+        <span class="online-dot"></span>
+        <span id="online-count">加载中...</span>
+      </div>
+
+      <!-- Action Cards -->
+      <div class="action-cards">
+        <div class="action-card" id="btn-create-room">
+          <span class="icon">➕</span>
+          <span class="label">创建房间</span>
+        </div>
+        <div class="action-card" id="btn-show-join">
+          <span class="icon">🔢</span>
+          <span class="label">加入房间</span>
+        </div>
+        <div class="action-card" id="btn-solo-mode">
+          <span class="icon">🧩</span>
+          <span class="label">单人练习</span>
+        </div>
+        <div class="action-card" id="btn-ai-puzzle">
+          <span class="icon">🤖</span>
+          <span class="label">AI 定制谜题</span>
+        </div>
+      </div>
+
+      <!-- Mode Selector -->
+      <div class="mode-section" id="mode-section" style="display:none;">
+        <div class="title">选择模式</div>
+        <div class="mode-grid" id="mode-grid">
+          <div class="mode-card selected" data-mode="turn">
+            <div class="mode-icon">🔄</div>
+            <div class="mode-name">轮流制</div>
+            <div class="mode-desc">每人轮流提问</div>
+          </div>
+          <div class="mode-card" data-mode="race">
+            <div class="mode-icon">⚡</div>
+            <div class="mode-name">抢答制</div>
+            <div class="mode-desc">AI回答最先提交</div>
+          </div>
+          <div class="mode-card" data-mode="coop">
+            <div class="mode-icon">🤝</div>
+            <div class="mode-name">合作制</div>
+            <div class="mode-desc">可见彼此问题</div>
+          </div>
+          <div class="mode-card" data-mode="compete">
+            <div class="mode-icon">🏆</div>
+            <div class="mode-name">竞技制</div>
+            <div class="mode-desc">独立提问比拼</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Join Section -->
+      <div class="join-section" id="join-section" style="display:none;">
+        <div class="divider">输入房间号加入</div>
+        <div class="join-row">
+          <input class="text-input" id="input-room-code" placeholder="输入6位房间号" maxlength="6">
+          <button class="btn btn-primary" id="btn-join-room">加入</button>
+        </div>
+      </div>
+
+      <!-- Public Rooms -->
+      <div class="recent-section" id="public-rooms-section">
+        <div class="title">
+          🚪 开放房间
+          <button class="btn-refresh" id="btn-refresh-rooms" style="background:none;border:none;color:var(--gold);cursor:pointer;font-size:11px;margin-left:auto;">🔄 刷新</button>
+        </div>
+        <div id="public-rooms">
+          <div class="empty-state" style="padding:24px;">
+            <div class="spinner" style="margin:0 auto 12px;"></div>
+            <div class="title" style="font-size:12px;">加载中...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Puzzle Browser -->
+      <div class="recent-section" id="puzzle-browser-section">
+        <div class="title">📜 选题目开房</div>
+        <div style="display:flex;gap:6px;margin-bottom:10px;flex-wrap:wrap;" id="puzzle-type-filters">
+          <button class="puzzle-type-btn selected" data-type="all">全部</button>
+        </div>
+        <div id="puzzle-list">
+          <div class="empty-state" style="padding:24px;">
+            <div class="spinner" style="margin:0 auto 12px;"></div>
+            <div class="title" style="font-size:12px;">加载中...</div>
+          </div>
+        </div>
+      </div>
+
+      <!-- Recent Rooms -->
+      <div class="recent-section">
+        <div class="title">最近房间</div>
+        <div id="recent-rooms">
+          <div class="empty-state" style="padding:24px;">
+            <div class="icon">🏚️</div>
+            <div class="title">暂无房间记录</div>
+            <div class="desc">创建房间开始游戏</div>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Page: Character (placeholder, 由 character.js 填充) -->
+  <div class="page hidden" id="page-character">
+    <div class="page-content" id="character-content">
+      <!-- 动态填充 -->
+    </div>
+  </div>
+
+  <!-- Page: Shop (placeholder) -->
+  <div class="page hidden" id="page-shop">
+    <div class="page-content" id="shop-content">
+      <!-- 动态填充 -->
+    </div>
+  </div>
+
+  <!-- Page: Result (no tab bar) -->
+  <div class="page hidden" id="page-result" style="padding-bottom:0;">
+    <div class="page-content" id="result-content">
+      <!-- 动态填充 -->
+    </div>
+  </div>
+
+  <!-- Page: Profile -->
+  <div class="page hidden" id="page-profile">
+    <div class="page-content" id="profile-content">
+      <!-- 动态填充 -->
+    </div>
+  </div>
+
+  <!-- Page: Leaderboard -->
+  <div class="page hidden" id="page-leaderboard">
+    <div class="page-content" id="leaderboard-content">
+      <!-- 动态填充 -->
+    </div>
+  </div>
+
+  <!-- Page: Room (no tab bar) -->
+  <div class="page hidden" id="page-room" style="padding-bottom:0;">
+    <div id="room-content">
+      <!-- 由 room.html iframe 或动态内容填充 -->
+    </div>
+  </div>
+
+  <!-- Tab Bar -->
+  <div class="tab-bar">
+    <button class="tab-item active" data-page="lobby">
+      <span class="tab-icon">🏠</span>
+      <span class="tab-label">大厅</span>
+    </button>
+    <button class="tab-item" data-page="character">
+      <span class="tab-icon">🎭</span>
+      <span class="tab-label">角色</span>
+    </button>
+    <button class="tab-item" data-page="shop">
+      <span class="tab-icon">🛒</span>
+      <span class="tab-label">商店</span>
+    </button>
+    <button class="tab-item" data-page="leaderboard">
+      <span class="tab-icon">🏆</span>
+      <span class="tab-label">排行</span>
+    </button>
+    <button class="tab-item" data-page="profile">
+      <span class="tab-icon">👤</span>
+      <span class="tab-label">我的</span>
+    </button>
+  </div>
+
+  <!-- Modal: Edit Name -->
+  <div class="modal-overlay" id="modal-name">
+    <div class="modal name-modal">
+      <div class="modal-title">修改昵称</div>
+      <div class="modal-body">
+        <input class="text-input" id="input-name" placeholder="输入新昵称" maxlength="8">
+        <div class="name-hint">1-8 个字符，修改后即时生效</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="V2App.hideModal('modal-name')">取消</button>
+        <button class="btn btn-primary" id="btn-save-name">确定</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Welcome (首次访问) -->
+  <div class="modal-overlay" id="modal-welcome">
+    <div class="modal welcome-modal">
+      <div class="modal-title">🕯️ 欢迎来到诡谜局</div>
+      <div class="modal-body">
+        <div class="welcome-sub">选择你的形象开始推理之旅</div>
+        <div class="gender-select">
+          <button class="gender-btn selected" data-gender="male">
+            <div class="gender-icon">🕵️</div>
+            <div class="gender-label">男性</div>
+          </button>
+          <button class="gender-btn" data-gender="female">
+            <div class="gender-icon">🕵️‍♀️</div>
+            <div class="gender-label">女性</div>
+          </button>
+        </div>
+        <input class="text-input" id="input-welcome-name" placeholder="给自己取个名字（可选）" maxlength="8">
+        <div class="name-hint">1-8 个字符，随时可在个人主页修改</div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-primary btn-block" id="btn-welcome-confirm">开始推理 →</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Create Room Config -->
+  <div class="modal-overlay" id="modal-config">
+    <div class="modal config-modal">
+      <div class="modal-title">创建房间</div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="config-row">
+          <span class="config-label">人数上限</span>
+          <div class="config-value">
+            <div class="player-stepper">
+              <button class="step-btn" id="btn-minus-player">−</button>
+              <span class="count" id="max-players">4</span>
+              <button class="step-btn" id="btn-plus-player">+</button>
+            </div>
+          </div>
+        </div>
+        <div class="config-row">
+          <span class="config-label">时间限制</span>
+          <div class="config-value">
+            <select id="select-time">
+              <option value="10">10 分钟</option>
+              <option value="15" selected>15 分钟</option>
+              <option value="20">20 分钟</option>
+              <option value="30">30 分钟</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="V2App.hideModal('modal-config')">取消</button>
+        <button class="btn btn-primary" id="btn-confirm-create">创建</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: AI 定制谜题 -->
+  <div class="modal-overlay" id="modal-ai-puzzle">
+    <div class="modal config-modal">
+      <div class="modal-title">🤖 AI 定制谜题</div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="config-row">
+          <span class="config-label">关键词</span>
+          <div class="config-value">
+            <input class="text-input" id="input-puzzle-keywords" placeholder="如：电梯、镜子、旧照片" style="width:160px;">
+          </div>
+        </div>
+        <div class="config-row">
+          <span class="config-label">类型</span>
+          <div class="config-value">
+            <select id="select-puzzle-type">
+              <option value="classic">经典海龟汤</option>
+              <option value="folk">民俗怪谈</option>
+              <option value="dream">梦核迷境</option>
+              <option value="cthulhu">克苏鲁异兆</option>
+              <option value="scary">恐怖惊悚</option>
+            </select>
+          </div>
+        </div>
+        <div class="config-row">
+          <span class="config-label">风格</span>
+          <div class="config-value">
+            <select id="select-puzzle-style">
+              <option value="twist">细思极恐·反转</option>
+              <option value="sad">悲伤温情</option>
+              <option value="scary">血腥惊悚</option>
+              <option value="weird">荒诞变格</option>
+            </select>
+          </div>
+        </div>
+        <div class="config-row">
+          <span class="config-label">难度</span>
+          <div class="config-value">
+            <select id="select-puzzle-difficulty">
+              <option value="easy">简单</option>
+              <option value="medium" selected>中等</option>
+              <option value="hard">困难</option>
+            </select>
+          </div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="V2App.hideModal('modal-ai-puzzle')">取消</button>
+        <button class="btn btn-primary" id="btn-generate-puzzle">生成谜题</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 登录 -->
+  <div class="modal-overlay" id="modal-login">
+    <div class="modal login-modal">
+      <div class="modal-title">🔐 登录账号</div>
+      <div class="modal-body" style="text-align:left;">
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">用户名</label>
+          <input class="text-input" id="input-login-username" placeholder="输入用户名" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:4px;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">密码</label>
+          <input class="text-input" id="input-login-password" type="password" placeholder="输入密码" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div id="login-error" style="color:var(--crimson-bright);font-size:12px;min-height:18px;margin-top:4px;"></div>
+        <div style="font-size:10px;color:var(--text-muted);margin-top:8px;display:flex;justify-content:space-between;align-items:center;">
+          <span id="current-login-status" style="color:var(--text-dim);">当前：未登录（匿名）</span>
+          <a href="javascript:void(0)" onclick="V2App.hideModal('modal-login');V2App.showForgotPwdModal()" style="color:var(--gold);text-decoration:none;font-size:10px;">忘记密码？</a>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" id="btn-login-register">注册</button>
+        <button class="btn btn-ghost" onclick="V2App.hideModal('modal-login')">取消</button>
+        <button class="btn btn-primary" id="btn-login-submit">登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 注册 -->
+  <div class="modal-overlay" id="modal-register">
+    <div class="modal login-modal">
+      <div class="modal-title">📝 注册新账号</div>
+      <div class="modal-body" style="text-align:left;">
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">用户名（3-20位）</label>
+          <input class="text-input" id="input-register-username" placeholder="输入用户名" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:4px;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">密码（6位以上）</label>
+          <input class="text-input" id="input-register-password" type="password" placeholder="输入密码" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div id="register-error" style="color:var(--crimson-bright);font-size:12px;min-height:18px;margin-top:4px;"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="V2App.hideModal('modal-register')">取消</button>
+        <button class="btn btn-primary" id="btn-register-submit">注册并登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 已登录信息 -->
+  <div class="modal-overlay" id="modal-account">
+    <div class="modal login-modal">
+      <div class="modal-title">👤 账号信息</div>
+      <div class="modal-body" style="text-align:center;">
+        <img src="../assets/pi-detective-v1.png" alt="皮探长" style="width:80px;height:80px;object-fit:cover;border-radius:12px;margin-bottom:10px;border:2px solid var(--border-gold);box-shadow:0 0 16px var(--gold-glow);">
+        <div style="font-size:16px;font-weight:700;color:var(--gold);margin-bottom:4px;" id="account-name">玩家</div>
+        <div style="font-size:11px;color:var(--text-muted);margin-bottom:4px;" id="account-type">登录方式：匿名</div>
+        <div style="font-size:11px;color:var(--text-dim);margin-bottom:16px;" id="account-id">UID: -</div>
+        <div id="account-gm-info" style="display:none;background:rgba(212,168,83,0.1);border:1px solid var(--gold);border-radius:8px;padding:8px;margin-bottom:12px;font-size:12px;color:var(--gold);">
+          ⭐ 内测管理员 · 无限资产
+        </div>
+        <div style="font-size:11px;color:var(--text-muted);line-height:1.6;margin-bottom:8px;">
+          注册账号后，你的游戏数据将永久保存。<br>即使更换设备也能恢复进度。
+        </div>
+        <div style="font-size:9px;color:var(--text-dim);margin-top:4px;">
+          <a href="javascript:void(0)" onclick="V2App.hideModal('modal-account');V2App.showTerms('privacy')" style="color:var(--gold);text-decoration:none;margin:0 4px;">隐私政策</a>·
+          <a href="javascript:void(0)" onclick="V2App.hideModal('modal-account');V2App.showTerms('service')" style="color:var(--gold);text-decoration:none;margin:0 4px;">服务协议</a>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="V2App.hideModal('modal-account')">关闭</button>
+        <button class="btn btn-ghost" id="btn-change-pwd" style="display:none;" onclick="V2App.hideModal('modal-account');V2App.showChangePwdModal()">修改密码</button>
+        <button class="btn btn-danger" id="btn-logout" style="display:none;">退出登录</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Player Profile (点击角色立绘弹出) -->
+  <div class="modal-overlay" id="modal-player-profile">
+    <div class="modal player-profile-modal">
+      <div class="modal-title">👤 玩家详情</div>
+      <div class="modal-body" id="modal-player-profile-body">
+        <!-- 动态填充 -->
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-block" onclick="V2App.hideModal('modal-player-profile')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Character Select (in room) -->
+  <div class="modal-overlay" id="modal-character-select">
+    <div class="modal config-modal" style="max-height:80vh;overflow-y:auto;">
+      <div class="modal-title">🎭 选择出战角色</div>
+      <div class="modal-body" id="modal-character-select-body">
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Add Friend by ID -->
+  <div class="modal-overlay" id="modal-add-friend">
+    <div class="modal config-modal">
+      <div class="modal-title">🤝 添加好友</div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="config-row">
+          <span class="config-label">好友ID</span>
+          <div class="config-value">
+            <input class="text-input" id="input-friend-id" placeholder="输入对方的用户ID" style="width:220px;">
+          </div>
+        </div>
+        <div class="config-row">
+          <span class="config-label">附言</span>
+          <div class="config-value">
+            <input class="text-input" id="input-friend-msg" placeholder="可选：打个招呼" maxlength="50" style="width:220px;">
+          </div>
+        </div>
+        <div id="add-friend-result" style="margin-top:8px;font-size:12px;color:var(--text-dim);display:none;"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="V2App.hideModal('modal-add-friend')">取消</button>
+        <button class="btn btn-primary" id="btn-confirm-add-friend">发送请求</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: Search Users -->
+  <div class="modal-overlay" id="modal-search-users">
+    <div class="modal config-modal" style="max-height:80vh;overflow-y:auto;">
+      <div class="modal-title">🔍 搜索玩家</div>
+      <div class="modal-body" style="text-align:left;">
+        <div class="config-row">
+          <span class="config-label">关键词</span>
+          <div class="config-value">
+            <input class="text-input" id="input-search-keyword" placeholder="输入昵称或用户ID" style="width:220px;">
+          </div>
+        </div>
+        <button class="btn btn-primary btn-block" id="btn-do-search" style="margin-bottom:12px;">搜索</button>
+        <div id="search-result-list">
+          <div style="font-size:12px;color:var(--text-muted);text-align:center;">输入关键词搜索其他玩家</div>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-block" onclick="V2App.hideModal('modal-search-users')">关闭</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 忘记密码 -->
+  <div class="modal-overlay" id="modal-v2-resetpwd">
+    <div class="modal login-modal">
+      <div class="modal-title">🔑 重置密码</div>
+      <div class="modal-body" style="text-align:left;">
+        <div id="v2-resetpwd-step1">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">输入注册时使用的邮箱，我们将发送6位验证码。</p>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">邮箱</label>
+            <input class="text-input" id="v2-resetpwd-email" placeholder="输入注册邮箱" style="width:100%;box-sizing:border-box;">
+          </div>
+          <div id="v2-resetpwd-error" style="color:var(--crimson-bright);font-size:12px;min-height:18px;"></div>
+          <div id="v2-resetpwd-success" style="display:none;color:var(--forest-bright);font-size:12px;margin-top:4px;"></div>
+        </div>
+        <div id="v2-resetpwd-step2" style="display:none;">
+          <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">请输入邮箱中的6位验证码，并设置新密码。</p>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">验证码</label>
+            <input class="text-input" id="v2-resetpwd-code" placeholder="输入6位验证码" maxlength="6" style="width:100%;box-sizing:border-box;">
+          </div>
+          <div style="margin-bottom:12px;">
+            <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">新密码（至少6位）</label>
+            <input class="text-input" id="v2-resetpwd-newpwd" type="password" placeholder="输入新密码" style="width:100%;box-sizing:border-box;">
+          </div>
+          <div id="v2-resetpwd-error2" style="color:var(--crimson-bright);font-size:12px;min-height:18px;display:none;"></div>
+          <div id="v2-resetpwd-success2" style="display:none;color:var(--forest-bright);font-size:12px;margin-top:4px;"></div>
+        </div>
+      </div>
+      <div class="modal-actions" id="v2-resetpwd-actions-step1">
+        <button class="btn btn-ghost" onclick="V2App.hideForgotPwdModal();V2App.showModal('modal-login')">返回登录</button>
+        <button class="btn btn-ghost" onclick="V2App.hideForgotPwdModal()">取消</button>
+        <button class="btn btn-primary" id="btn-v2-resetpwd-submit" onclick="V2App.handleForgotPassword()">发送验证码</button>
+      </div>
+      <div class="modal-actions" id="v2-resetpwd-actions-step2" style="display:none;">
+        <button class="btn btn-ghost" onclick="V2App.hideForgotPwdModal();V2App.showModal('modal-login')">返回登录</button>
+        <button class="btn btn-ghost" onclick="V2App.hideForgotPwdModal()">取消</button>
+        <button class="btn btn-primary" id="btn-v2-resetpwd-confirm" onclick="V2App.handleForgotPwdConfirm()">确认重置</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 修改密码（已登录） -->
+  <div class="modal-overlay" id="modal-v2-changepwd">
+    <div class="modal login-modal">
+      <div class="modal-title">🔐 修改密码</div>
+      <div class="modal-body" style="text-align:left;">
+        <p style="font-size:12px;color:var(--text-muted);margin-bottom:12px">输入当前密码和新密码。</p>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">当前密码</label>
+          <input class="text-input" id="v2-changepwd-old" type="password" placeholder="输入当前密码" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:12px;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">新密码（至少6位）</label>
+          <input class="text-input" id="v2-changepwd-new" type="password" placeholder="输入新密码" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div style="margin-bottom:4px;">
+          <label style="font-size:11px;color:var(--text-muted);display:block;margin-bottom:4px;">确认新密码</label>
+          <input class="text-input" id="v2-changepwd-new2" type="password" placeholder="再次输入新密码" style="width:100%;box-sizing:border-box;">
+        </div>
+        <div id="v2-changepwd-error" style="color:var(--crimson-bright);font-size:12px;min-height:18px;margin-top:4px;"></div>
+        <div id="v2-changepwd-success" style="display:none;color:var(--forest-bright);font-size:12px;margin-top:4px;"></div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost" onclick="V2App.hideChangePwdModal();showAccountModal()">返回</button>
+        <button class="btn btn-ghost" onclick="V2App.hideChangePwdModal()">取消</button>
+        <button class="btn btn-primary" id="btn-v2-changepwd-submit" onclick="V2App.handleChangePassword()">确认修改</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- Modal: 服务条款 / 隐私政策 -->
+  <div class="modal-overlay" id="modal-terms">
+    <div class="modal config-modal" style="max-width:460px;max-height:80vh;overflow-y:auto;">
+      <div class="modal-title" id="terms-title">📋 服务协议</div>
+      <div class="modal-body" id="terms-body" style="font-size:12px;line-height:1.8;color:var(--text-dim);">
+        <!-- 由 V2App.showTerms() 动态填充 -->
+      </div>
+      <div class="modal-actions">
+        <button class="btn btn-ghost btn-block" onclick="V2App.hideTermsModal()">关闭</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- Scripts -->
+<script src="https://static.cloudbase.net/cloudbase-js-sdk/2.28.6/cloudbase.full.js"></script>
+<script src="mock.js?v=2"></script>
+<script src="v2-app.js?v=2"></script>
+<script src="theme-fx.js?v=2"></script>
+<script src="room-game.js?v=9"></script>
+<script src="character-ui.js"></script>
+<script src="shop-ui.js"></script>
+<script src="result-ui.js?v=2"></script>
+<script src="profile-ui.js?v=2"></script>
+<script src="leaderboard-ui.js"></script>
+<script>
+// ================================================================
+// Lobby 交互逻辑
+// ================================================================
+(function() {
+  let selectedMode = 'turn';
+  let maxPlayers = 4;
+
+  // ---- Edit Name ----
+  document.getElementById('btn-edit-name').addEventListener('click', () => {
+    document.getElementById('input-name').value = V2App.user.name;
+    V2App.showModal('modal-name');
+    setTimeout(() => document.getElementById('input-name').focus(), 300);
+  });
+
+  document.getElementById('btn-save-name').addEventListener('click', async () => {
+    const name = document.getElementById('input-name').value;
+    const ok = await V2App.setPlayerName(name);
+    if (ok) V2App.hideModal('modal-name');
+  });
+
+  document.getElementById('input-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-save-name').click();
+  });
+
+  // ---- Welcome Modal (首次访问) ----
+  document.querySelectorAll('#modal-welcome .gender-btn').forEach(btn => {
+    btn.addEventListener('click', () => {
+      document.querySelectorAll('#modal-welcome .gender-btn').forEach(b => b.classList.remove('selected'));
+      btn.classList.add('selected');
+    });
+  });
+
+  document.getElementById('btn-welcome-confirm').addEventListener('click', () => {
+    V2App.completeFirstSetup();
+  });
+
+  document.getElementById('input-welcome-name').addEventListener('keydown', e => {
+    if (e.key === 'Enter') V2App.completeFirstSetup();
+  });
+
+  // ---- Mode Selection ----
+  document.getElementById('mode-grid').addEventListener('click', e => {
+    const card = e.target.closest('.mode-card');
+    if (!card) return;
+    document.querySelectorAll('.mode-card').forEach(c => c.classList.remove('selected'));
+    card.classList.add('selected');
+    selectedMode = card.dataset.mode;
+  });
+
+  // ---- Create Room ----
+  document.getElementById('btn-create-room').addEventListener('click', () => {
+    if (!V2App.user.unlocked) {
+      V2App.toast('创建房间需要解锁完整版', 'error');
+      V2App.showPage('shop');
+      return;
+    }
+    V2App.showModal('modal-config');
+  });
+
+  document.getElementById('btn-minus-player').addEventListener('click', () => {
+    if (maxPlayers > 2) { maxPlayers--; document.getElementById('max-players').textContent = maxPlayers; }
+  });
+  document.getElementById('btn-plus-player').addEventListener('click', () => {
+    if (maxPlayers < 6) { maxPlayers++; document.getElementById('max-players').textContent = maxPlayers; }
+  });
+
+  document.getElementById('btn-confirm-create').addEventListener('click', async () => {
+    const timeLimit = parseInt(document.getElementById('select-time').value);
+    const btn = document.getElementById('btn-confirm-create');
+    btn.disabled = true;
+    btn.textContent = '创建中...';
+
+    try {
+      const res = await V2App.callFn('roomManager', {
+        action: 'createRoom', mode: selectedMode, maxPlayers, timeLimit
+      });
+
+      btn.disabled = false;
+      btn.textContent = '创建';
+
+      if (res && res.code === 0) {
+        V2App.hideModal('modal-config');
+        // 保存最近房间记录
+        const shareCode = res.data.shareCode || '';
+        if (shareCode && typeof saveRecentRoom === 'function') {
+          saveRecentRoom(shareCode, res.data.roomId, selectedMode, 1);
+        }
+        V2App.goToRoom(res.data.roomId);
+        V2App.toast('房间已创建！分享房间号给好友', 'success');
+      } else {
+        V2App.toast(res?.message || '创建房间失败，请稍后再试', 'error');
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '创建';
+      V2App.toast('网络异常，请检查连接后重试', 'error');
+      console.error('创建房间异常:', err);
+    }
+  });
+
+  // ---- Join Room ----
+  let joinVisible = false;
+  document.getElementById('btn-show-join').addEventListener('click', () => {
+    joinVisible = !joinVisible;
+    const section = document.getElementById('join-section');
+    section.style.display = joinVisible ? 'block' : 'none';
+    if (joinVisible) {
+      document.getElementById('input-room-code').focus();
+      section.querySelector('.divider').style.animation = 'fadeIn .3s ease-out';
+    }
+  });
+
+  document.getElementById('btn-join-room').addEventListener('click', async () => {
+    const code = document.getElementById('input-room-code').value.trim().toUpperCase();
+    if (code.length < 4) {
+      V2App.toast('请输入有效的房间号', 'error');
+      return;
+    }
+    const btn = document.getElementById('btn-join-room');
+    btn.disabled = true;
+    btn.textContent = '加入中...';
+
+    try {
+      const res = await V2App.callFn('roomManager', { action: 'joinRoom', shareCode: code });
+
+      btn.disabled = false;
+      btn.textContent = '加入';
+
+      if (res && res.code === 0) {
+        const room = res.data.room;
+        if (room && typeof saveRecentRoom === 'function') {
+          saveRecentRoom(room.shareCode || code, room.roomId, room.mode || 'turn', (room.players || []).length);
+        }
+        V2App.goToRoom(room.roomId);
+      } else {
+        V2App.toast(res?.message || '房间不存在或已满员', 'error');
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '加入';
+      V2App.toast('网络异常，请检查连接后重试', 'error');
+      console.error('加入房间异常:', err);
+    }
+  });
+
+  document.getElementById('input-room-code').addEventListener('keydown', e => {
+    if (e.key === 'Enter') document.getElementById('btn-join-room').click();
+  });
+
+  // ---- AI 定制谜题 ----
+  document.getElementById('btn-ai-puzzle').addEventListener('click', () => {
+    V2App.showModal('modal-ai-puzzle');
+  });
+
+  // ===== 单人练习：直接创建 solo 模式房间 =====
+  document.getElementById('btn-solo-mode').addEventListener('click', async () => {
+    const btn = document.getElementById('btn-solo-mode');
+    btn.style.opacity = '0.6';
+    btn.style.pointerEvents = 'none';
+
+    const res = await V2App.callFn('roomManager', {
+      action: 'createRoom',
+      mode: 'solo',
+      maxPlayers: 1,
+      timeLimit: 15
+    });
+
+    btn.style.opacity = '';
+    btn.style.pointerEvents = '';
+
+    if (res && res.code === 0) {
+      V2App.goToRoom(res.data.roomId);
+      V2App.toast('单人练习模式 · 向 AI 提问来推理真相', 'info');
+    } else {
+      V2App.toast('创建失败: ' + (res?.message || '请重试'), 'error');
+    }
+  });
+
+  document.getElementById('btn-generate-puzzle').addEventListener('click', async () => {
+    const keywords = document.getElementById('input-puzzle-keywords').value.trim();
+    if (!keywords) {
+      V2App.toast('请输入关键词', 'error');
+      return;
+    }
+    const type = document.getElementById('select-puzzle-type').value;
+    const style = document.getElementById('select-puzzle-style').value;
+    const difficulty = document.getElementById('select-puzzle-difficulty').value;
+
+    const btn = document.getElementById('btn-generate-puzzle');
+    btn.disabled = true;
+    btn.textContent = '生成中...';
+
+    const res = await V2App.callFn('genPuzzle', { keywords, type, style, difficulty });
+
+    btn.disabled = false;
+    btn.textContent = '生成谜题';
+
+    if (res && res.ok) {
+      V2App.hideModal('modal-ai-puzzle');
+      // 用 AI 生成的谜题创建单人房间
+      const puzzle = res.puzzle;
+      const roomRes = await V2App.callFn('roomManager', {
+        action: 'createRoom',
+        mode: selectedMode,
+        maxPlayers,
+        timeLimit: parseInt(document.getElementById('select-time')?.value || '15'),
+        customPuzzle: puzzle
+      });
+      if (roomRes && roomRes.code === 0) {
+        if (roomRes.data.shareCode && typeof saveRecentRoom === 'function') {
+          saveRecentRoom(roomRes.data.shareCode, roomRes.data.roomId, selectedMode, 1);
+        }
+        V2App.goToRoom(roomRes.data.roomId);
+        V2App.toast('AI 谜题已生成！', 'success');
+      }
+    } else {
+      V2App.toast((res && res.error) || '生成失败，请重试', 'error');
+    }
+  });
+
+  // ---- Show mode section when clicking create ----
+  document.getElementById('btn-create-room').addEventListener('click', () => {
+    document.getElementById('mode-section').style.display = 'block';
+    document.getElementById('mode-section').style.animation = 'fadeIn .3s ease-out';
+  });
+
+  // ================================================================
+  // 登录系统
+  // ================================================================
+  const $loginError = document.getElementById('login-error');
+  const $registerError = document.getElementById('register-error');
+
+  // 打开登录弹窗
+  document.getElementById('btn-login').addEventListener('click', () => {
+    if (V2App.user.loginType === 'password') {
+      // 已登录 → 显示账号信息
+      showAccountModal();
+      return;
+    }
+    updateLoginStatusText();
+    V2App.showModal('modal-login');
+  });
+
+  // 登录按钮
+  document.getElementById('btn-login-submit').addEventListener('click', async () => {
+    const username = document.getElementById('input-login-username').value.trim();
+    const password = document.getElementById('input-login-password').value;
+    if (!username || !password) {
+      $loginError.textContent = '请输入用户名和密码';
+      return;
+    }
+    const btn = document.getElementById('btn-login-submit');
+    btn.disabled = true;
+    btn.textContent = '登录中...';
+    $loginError.textContent = '';
+
+    try {
+      const result = await V2App.loginWithPassword(username, password);
+      btn.disabled = false;
+      btn.textContent = '登录';
+
+      if (result.ok) {
+        V2App.hideModal('modal-login');
+        V2App.toast('登录成功！' + (V2App.user.isGm ? ' ⭐GM' : ''), 'success');
+        await V2App.loadUserData();
+        V2App.renderUserBar();
+        if (typeof CharacterUI !== 'undefined') await CharacterUI.init();
+        if (typeof ShopUI !== 'undefined') await ShopUI.init();
+      } else {
+        $loginError.textContent = result.error || '登录失败';
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '登录';
+      $loginError.textContent = '网络异常，请稍后重试';
+      console.error('登录异常:', err);
+    }
+  });
+
+  // 按 Enter 登录（用户名 → 聚焦密码，密码 → 提交）
+  document.getElementById('input-login-username').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('input-login-password').focus();
+  });
+  document.getElementById('input-login-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-login-submit').click();
+  });
+
+  // 切换到注册
+  document.getElementById('btn-login-register').addEventListener('click', () => {
+    V2App.hideModal('modal-login');
+    // 预填用户名
+    const username = document.getElementById('input-login-username').value.trim();
+    document.getElementById('input-register-username').value = username;
+    document.getElementById('input-register-password').value = '';
+    $registerError.textContent = '';
+    V2App.showModal('modal-register');
+  });
+
+  // 注册按钮
+  document.getElementById('btn-register-submit').addEventListener('click', async () => {
+    const username = document.getElementById('input-register-username').value.trim();
+    const password = document.getElementById('input-register-password').value;
+    if (!username || username.length < 3) {
+      $registerError.textContent = '用户名至少3位';
+      return;
+    }
+    if (!password || password.length < 6) {
+      $registerError.textContent = '密码至少6位';
+      return;
+    }
+    const btn = document.getElementById('btn-register-submit');
+    btn.disabled = true;
+    btn.textContent = '注册中...';
+    $registerError.textContent = '';
+
+    try {
+      const result = await V2App.signUp(username, password);
+      btn.disabled = false;
+      btn.textContent = '注册并登录';
+
+      if (result.ok) {
+        V2App.hideModal('modal-register');
+        V2App.toast('注册成功！欢迎 ' + username, 'success');
+        await V2App.loadUserData();
+        V2App.renderUserBar();
+        if (typeof CharacterUI !== 'undefined') await CharacterUI.init();
+        if (typeof ShopUI !== 'undefined') await ShopUI.init();
+      } else {
+        $registerError.textContent = result.error || '注册失败';
+      }
+    } catch (err) {
+      btn.disabled = false;
+      btn.textContent = '注册并登录';
+      $registerError.textContent = '网络异常，请稍后重试';
+      console.error('注册异常:', err);
+    }
+  });
+
+  // 按 Enter 注册（用户名 → 聚焦密码，密码 → 提交）
+  document.getElementById('input-register-username').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('input-register-password').focus();
+  });
+  document.getElementById('input-register-password').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter') document.getElementById('btn-register-submit').click();
+  });
+
+  // 退出登录
+  document.getElementById('btn-logout').addEventListener('click', async () => {
+    V2App.hideModal('modal-account');
+    await V2App.logout();
+    V2App.toast('已退出登录', 'info');
+  });
+
+  // 显示账号信息 Modal
+  function showAccountModal() {
+    const u = V2App.user;
+    document.getElementById('account-name').textContent = u.name;
+    document.getElementById('account-type').textContent = '登录方式：' + (u.loginType === 'password' ? '账号密码' : '匿名');
+    document.getElementById('account-id').textContent = 'UID: ' + (u.id || '-');
+    document.getElementById('btn-logout').style.display = u.loginType === 'password' ? '' : 'none';
+    document.getElementById('btn-change-pwd').style.display = u.loginType === 'password' ? '' : 'none';
+    const gmInfo = document.getElementById('account-gm-info');
+    gmInfo.style.display = u.isGm ? '' : 'none';
+    V2App.showModal('modal-account');
+  }
+
+  // 更新登录状态文字
+  function updateLoginStatusText() {
+    const el = document.getElementById('current-login-status');
+    if (el) {
+      el.textContent = '当前：' + (V2App.user.loginType === 'password' ? '已登录 · ' + V2App.user.name : '未登录（匿名）');
+    }
+  }
+  // 暴露为全局
+  window.updateLoginStatusText = updateLoginStatusText;
+  window.showAccountModal = showAccountModal;
+
+  // ---- Populate character/shop pages with real JS ----
+    function loadPageContent() {
+      // 初始化角色页和商店页
+      if (typeof CharacterUI !== 'undefined') CharacterUI.init();
+      if (typeof ShopUI !== 'undefined') ShopUI.init();
+      // 初始化个人主页
+      if (typeof ProfileUI !== 'undefined') ProfileUI.init();
+      // 初始化排行榜（延迟加载，切到排行榜页时才真正加载）
+      if (typeof LeaderboardUI !== 'undefined') LeaderboardUI.render();
+      // 渲染最近房间
+      renderRecentRooms();
+    }
+
+    // CloudBase 相关的大厅数据加载（在 V2App.init() 完成后调用）
+    async function loadLobbyData() {
+      await loadOnlineCount();
+      await loadPublicRooms();
+      await loadPuzzleBrowser();
+    }
+
+  // 暴露全局
+  window.loadLobbyData = loadLobbyData;
+  async function loadOnlineCount() {
+    const el = document.getElementById('online-count');
+    if (!el) return;
+    try {
+      const res = await V2App.callFn('roomManager', { action: 'getOnlineCount' });
+      const data = res && res.data;
+      if (data) {
+        el.textContent = `${(data.count || 0).toLocaleString()} 人在线 · ${data.activeRooms || 0} 个房间`;
+      }
+    } catch (err) {
+      el.textContent = '-- 人在线';
+    }
+  }
+
+  // ---- Recent Rooms ----
+  function renderRecentRooms() {
+    const container = document.getElementById('recent-rooms');
+    if (!container) return;
+    try {
+      const stored = localStorage.getItem('guimiju_v2_recent_rooms');
+      const rooms = stored ? JSON.parse(stored) : [];
+      if (rooms.length === 0) return; // 保留默认空状态
+
+      container.innerHTML = rooms.slice(0, 5).map(r => `
+        <div class="recent-item" data-code="${r.shareCode}" data-roomid="${r.roomId || ''}">
+          <div class="room-info">
+            <span class="room-code">#${r.shareCode}</span>
+            <span class="room-meta">${r.playerCount || '?'} 人 · ${r.modeName || r.mode || '轮流制'}</span>
+          </div>
+          <span class="room-status ${r.status || 'waiting'}">${r.status === 'playing' ? '游戏中' : '等待中'}</span>
+        </div>
+      `).join('');
+
+      // 点击最近房间：尝试重新加入
+      container.querySelectorAll('.recent-item').forEach(item => {
+        item.addEventListener('click', () => {
+          const code = item.dataset.code;
+          if (code) {
+            document.getElementById('input-room-code').value = code;
+            document.getElementById('btn-join-room').click();
+          }
+        });
+      });
+    } catch (e) {
+      console.warn('渲染最近房间失败:', e.message);
+    }
+  }
+
+  // 保存房间到最近记录
+  window.saveRecentRoom = function(shareCode, roomId, mode, playerCount) {
+    try {
+      const stored = localStorage.getItem('guimiju_v2_recent_rooms');
+      let rooms = stored ? JSON.parse(stored) : [];
+      // 移除重复
+      rooms = rooms.filter(r => r.shareCode !== shareCode);
+      // 添加到开头
+      const modeNames = { turn: '轮流制', race: '抢答制', coop: '合作制', compete: '竞技制' };
+      rooms.unshift({
+        shareCode,
+        roomId,
+        mode,
+        modeName: modeNames[mode] || mode,
+        playerCount,
+        status: 'waiting',
+        timestamp: Date.now()
+      });
+      // 最多保留 10 条
+      rooms = rooms.slice(0, 10);
+      localStorage.setItem('guimiju_v2_recent_rooms', JSON.stringify(rooms));
+    } catch (e) {
+      console.warn('保存最近房间失败:', e.message);
+    }
+  };
+
+  // ================================================================
+  // 开放房间列表（大厅展示活跃的多人房间）
+  // ================================================================
+  async function loadPublicRooms() {
+    const container = document.getElementById('public-rooms');
+    if (!container) return;
+
+    try {
+      const res = await V2App.callFn('roomManager', { action: 'listPublicRooms' });
+      const rooms = (res && res.data && res.data.rooms) || [];
+
+      if (rooms.length === 0) {
+        container.innerHTML = `<div class="empty-state" style="padding:24px;">
+          <div class="icon">🏚️</div>
+          <div class="title">暂无开放房间</div>
+          <div class="desc">成为第一个创建房间的人吧！</div>
+        </div>`;
+        return;
+      }
+
+      const modeIcons = { turn: '🔄', race: '⚡', coop: '🤝', compete: '🏆' };
+      container.innerHTML = rooms.map(r => `
+        <div class="public-room-card" data-roomid="${r.roomId}" data-sharecode="${r.shareCode}">
+          <div class="room-left">
+            <div class="room-code-line">#${r.shareCode} ${r.status === 'playing' ? '🔴' : '🟢'}</div>
+            <div class="room-title-line">📖 ${r.puzzleTitle || '随机谜题'}</div>
+            <div class="room-meta-line">
+              <span>${modeIcons[r.mode] || '🔄'} ${r.modeName}</span>
+              <span>·</span>
+              <span>${r.timeLimit}分钟</span>
+            </div>
+          </div>
+          <div class="room-right">
+            <div class="room-players">${r.playerCount}/${r.maxPlayers}</div>
+            <div class="room-mode-tag">${r.status === 'playing' ? '游戏中' : '等待中'}</div>
+            <div class="room-avatars">${(r.players || []).slice(0,4).map(p =>
+              `<span class="room-avatar" title="${p.name}">${p.avatar || '🕵️'}</span>`
+            ).join('')}</div>
+          </div>
+        </div>
+      `).join('');
+
+      // 点击进入房间
+      container.querySelectorAll('.public-room-card').forEach(card => {
+        card.addEventListener('click', async () => {
+          const roomId = card.dataset.roomid;
+          const shareCode = card.dataset.sharecode;
+          if (!roomId) return;
+          const btn = card;
+          btn.style.opacity = '0.6';
+          try {
+            // 尝试加入（如果已在房间中或房间满，云函数会返回错误）
+            const res = await V2App.callFn('roomManager', { action: 'joinRoom', shareCode });
+            if (res && res.code === 0) {
+              if (shareCode && typeof saveRecentRoom === 'function') {
+                saveRecentRoom(shareCode, roomId, res.data.room?.mode || 'turn', (res.data.room?.players || []).length);
+              }
+              V2App.goToRoom(roomId);
+            } else {
+              V2App.toast(res?.message || '无法加入该房间', 'error');
+            }
+          } catch (err) {
+            V2App.toast('加入失败，请重试', 'error');
+          }
+          btn.style.opacity = '';
+        });
+      });
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state" style="padding:24px;">
+        <div class="icon">⚠️</div>
+        <div class="title">加载失败</div>
+        <div class="desc">点击刷新重试</div>
+      </div>`;
+      console.warn('加载开放房间失败:', err.message);
+    }
+  }
+
+  // 刷新按钮
+  document.getElementById('btn-refresh-rooms').addEventListener('click', () => {
+    const container = document.getElementById('public-rooms');
+    if (container) {
+      container.innerHTML = `<div class="empty-state" style="padding:24px;">
+        <div class="spinner" style="margin:0 auto 12px;"></div>
+        <div class="title" style="font-size:12px;">加载中...</div>
+      </div>`;
+    }
+    loadPublicRooms();
+  });
+
+  // ================================================================
+  // 谜题浏览器（浏览题库，选一道题创建房间）
+  // ================================================================
+  let puzzleBrowserState = { type: 'all', page: 1 };
+
+  async function loadPuzzleBrowser(type = 'all') {
+    puzzleBrowserState.type = type;
+    puzzleBrowserState.page = 1;
+    const container = document.getElementById('puzzle-list');
+    if (!container) return;
+
+    container.innerHTML = `<div class="empty-state" style="padding:24px;">
+      <div class="spinner" style="margin:0 auto 12px;"></div>
+      <div class="title" style="font-size:12px;">加载中...</div>
+    </div>`;
+
+    try {
+      const res = await V2App.callFn('roomManager', { action: 'listPuzzles', type, pageSize: 20 });
+      const data = res && res.data;
+      const items = (data && data.items) || [];
+      const types = (data && data.types) || [];
+
+      // 更新类型筛选按钮
+      const filterContainer = document.getElementById('puzzle-type-filters');
+      if (filterContainer && types.length > 0) {
+        filterContainer.innerHTML = `<button class="puzzle-type-btn ${type === 'all' ? 'selected' : ''}" data-type="all">全部</button>` +
+          types.map(t => `<button class="puzzle-type-btn ${type === t.value ? 'selected' : ''}" data-type="${t.value}">${t.label}</button>`).join('');
+
+        filterContainer.querySelectorAll('.puzzle-type-btn').forEach(btn => {
+          btn.addEventListener('click', () => {
+            filterContainer.querySelectorAll('.puzzle-type-btn').forEach(b => b.classList.remove('selected'));
+            btn.classList.add('selected');
+            loadPuzzleBrowser(btn.dataset.type);
+          });
+        });
+      }
+
+      if (items.length === 0) {
+        container.innerHTML = `<div class="empty-state" style="padding:24px;">
+          <div class="icon">📭</div>
+          <div class="title">暂无此类谜题</div>
+        </div>`;
+        return;
+      }
+
+      const typeNames = { logic: '本格推理', twist: '叙诡反转', eerie: '细思极恐', occult: '变格悬疑', dark: '暗黑重口' };
+      const starMap = { 1: '⭐', 2: '⭐⭐', 3: '⭐⭐⭐', 4: '⭐⭐⭐⭐', 5: '⭐⭐⭐⭐⭐' };
+
+      container.innerHTML = items.map(p => `
+        <div class="puzzle-card" data-puzzle-id="${p.id}" data-puzzle-title="${p.title}">
+          <div class="puzzle-stars" title="难度 ${p.stars}/5">${starMap[p.stars] || '⭐⭐'}</div>
+          <div class="puzzle-info">
+            <div class="puzzle-title">#${p.id} ${p.title}</div>
+            <div class="puzzle-preview">${p.riddle || ''}</div>
+            <div class="puzzle-meta">
+              <span class="puzzle-type-tag">${typeNames[p.type] || p.type}</span>
+              <span>${p.level}</span>
+            </div>
+          </div>
+          <button class="btn-enter" data-puzzle-id="${p.id}" data-puzzle-title="${p.title}">开房</button>
+        </div>
+      `).join('');
+
+      // 点击「开房」按钮 → 创建房间并指定这道题
+      container.querySelectorAll('.btn-enter').forEach(btn => {
+        btn.addEventListener('click', async (e) => {
+          e.stopPropagation(); // 防止冒泡到卡片
+          const puzzleId = parseInt(btn.dataset.puzzleId);
+          const puzzleTitle = btn.dataset.puzzleTitle;
+
+          if (!V2App.user.unlocked) {
+            V2App.toast('多人模式需要解锁完整版', 'error');
+            V2App.showPage('shop');
+            return;
+          }
+
+          btn.disabled = true;
+          btn.textContent = '创建中...';
+
+          try {
+            const res = await V2App.callFn('roomManager', {
+              action: 'createRoom',
+              puzzleId,
+              mode: selectedMode,
+              maxPlayers,
+              timeLimit: parseInt(document.getElementById('select-time')?.value || '15')
+            });
+
+            if (res && res.code === 0) {
+              if (res.data.shareCode && typeof saveRecentRoom === 'function') {
+                saveRecentRoom(res.data.shareCode, res.data.roomId, selectedMode, 1);
+              }
+              V2App.toast(`房间已创建 · 谜题：${puzzleTitle}`, 'success');
+              V2App.goToRoom(res.data.roomId);
+            } else {
+              V2App.toast(res?.message || '创建失败', 'error');
+            }
+          } catch (err) {
+            V2App.toast('创建失败，请重试', 'error');
+          }
+          btn.disabled = false;
+          btn.textContent = '开房';
+        });
+      });
+    } catch (err) {
+      container.innerHTML = `<div class="empty-state" style="padding:24px;">
+        <div class="icon">⚠️</div>
+        <div class="title">加载失败</div>
+        <div class="desc">请刷新页面重试</div>
+      </div>`;
+      console.warn('加载谜题列表失败:', err.message);
+    }
+  }
+
+  loadPageContent();
+  // 初始化主题特效系统（替代旧粒子）
+  if (typeof ThemeFX !== 'undefined') ThemeFX.init();
+
+  // 等 V2App 初始化完成后再加载大厅数据（开放房间、谜题、在线人数）
+  if (typeof V2App !== 'undefined' && V2App._initPromise) {
+    V2App._initPromise.then(() => { if (window.loadLobbyData) window.loadLobbyData(); });
+  }
+
+  // ===== Deep Link：URL ?code=XXX 自动加入房间 =====
+  (function handleDeepLink() {
+    const params = new URLSearchParams(window.location.search);
+    const code = params.get('code');
+    if (!code) return;
+    const cleanCode = code.trim().toUpperCase().slice(0, 6);
+    if (cleanCode.length < 4) return;
+
+    // 等 V2App 初始化完成后再处理
+    const doJoin = async () => {
+      await V2App._initPromise;
+      document.getElementById('input-room-code').value = cleanCode;
+      // 显示加入区域
+      document.getElementById('join-section').style.display = 'block';
+      joinVisible = true;
+
+      // 先预览房间（检查是否可加入）
+      try {
+        const preview = await V2App.callFn('roomManager', { action: 'getRoomPreview', shareCode: cleanCode });
+        if (preview && preview.code === 0 && preview.data && preview.data.canJoin) {
+          const data = preview.data;
+          const modeNames = { turn: '轮流制', race: '抢答制', coop: '合作制', compete: '竞技制' };
+          V2App.toast(
+            `📨 邀请加入「${data.puzzleTitle || '推理'}」· ${modeNames[data.mode] || data.modeName} · ${data.playerCount}/${data.maxPlayers}人`,
+            'info'
+          );
+          // 2 秒后自动加入
+          setTimeout(() => {
+            document.getElementById('btn-join-room').click();
+          }, 1500);
+        } else if (preview && preview.code === 0 && preview.data && !preview.data.canJoin) {
+          V2App.toast('该房间已满或已结束', 'error');
+        } else {
+          // 预览失败，直接尝试加入
+          setTimeout(() => {
+            document.getElementById('btn-join-room').click();
+          }, 1000);
+        }
+      } catch (e) {
+        // 预览失败也直接尝试加入
+        setTimeout(() => {
+          document.getElementById('btn-join-room').click();
+        }, 1000);
+      }
+    };
+
+    if (V2App._initPromise) {
+      doJoin();
+    } else {
+      // initPromise 还没准备好，等 DOM 就绪后再试
+      document.addEventListener('DOMContentLoaded', doJoin);
+    }
+  })();
+})();
+</script>
+
+</body>
+</html>

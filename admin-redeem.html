@@ -318,7 +318,7 @@ async function queryCode() {
           ${c.status === 'used' ? `
           <div class="log-entry" style="color:#4ade80"><span class="ts">使用时间:</span> ${new Date(c.usedAt).toLocaleString()}</div>
           <div class="log-entry"><span class="ts">使用者:</span> <span class="user-val">${c.usedBy || 'N/A'}</span></div>
-          <div class="log-entry"><span class="ts">兑换上下文:</span> ${c.redeemedContext ? JSON.stringify(c.redeemedContext) : 'N/A'}</div>
+          <div class="log-entry"><span class="ts">兑换上下文:</span> ${c.redeemTimestamp ? `时间:${c.redeemTimestamp} UA:${c.redeemUserAgent||'N/A'} IP:${c.redeemClientIp||'N/A'}` : (c.redeemedContext ? JSON.stringify(c.redeemedContext) : 'N/A')}</div>
           ` : ''}
         </div>`;
     } else {

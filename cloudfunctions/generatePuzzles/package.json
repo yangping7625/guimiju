@@ -1,0 +1,7 @@
+{
+  "name": "generatePuzzles",
+  "version": "1.0.0",
+  "description": "AI 批量生成诡谜局谜题",
+  "main": "index.js",
+  "dependencies": {}
+}

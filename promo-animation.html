@@ -33,10 +33,9 @@ const W = 1080, H = 1920;
 
 // ---- 素材（全部在 assets/ 下，无 V2 内容） ----
 const ASSETS = {
-  logo:      'assets/guimiju-logo-v4.jpg',
-  piMain:    'assets/pi-detective-v1.jpg',
-  piEmotions:'assets/pi-detective-emotions.jpg',
-  piScene:   'assets/pi-detective-scene.jpg',
+  logo:      'assets/guimiju-logo-v4-notext(1).jpg',
+  piMain:    'assets/pi-detective-v1.png',
+  piEmotions:'assets/pi-detective-emotions.png',
 };
 
 // ---- 图片加载 ----
@@ -198,17 +197,21 @@ function scene2(t) {
   drawDarkBg(t, '#060612', '#0c0a1a');
   drawParticles();
 
-  // 皮探长从左下角滑入（白底抠图效果——用圆角矩形框模拟）
+  // 皮探长从左下角滑入（透明底PNG，加暗色圆底衬）
   const slideIn = easeOut(clamp01(st / 1.2));
   const piX = -300 + slideIn * 100;
   const piY = H - 350;
   ctx.save();
   ctx.globalAlpha = slideIn;
   if (images.piMain) {
-    // 绘制皮探长（白底图，加个暗色圆形底衬让白底不那么突兀）
-    ctx.fillStyle = 'rgba(15,12,25,0.7)';
-    ctx.beginPath(); ctx.arc(piX+180, piY+220, 200, 0, Math.PI*2); ctx.fill();
-    drawImg(images.piMain, piX, piY-20, 360, 480, 30);
+    // 暗色圆形底衬
+    ctx.fillStyle = 'rgba(15,12,25,0.85)';
+    ctx.beginPath(); ctx.arc(piX+180, piY+200, 190, 0, Math.PI*2); ctx.fill();
+    // 微光边缘
+    ctx.strokeStyle = 'rgba(212,168,83,0.15)';
+    ctx.lineWidth = 2;
+    ctx.stroke();
+    drawImg(images.piMain, piX+10, piY-30, 340, 460, 0);
   }
   ctx.restore();
 
@@ -350,21 +353,23 @@ function scene4(t) {
   ctx.fillStyle = fogGrad;
   ctx.fillRect(0, 0, W, H);
 
-  // 皮探长神秘表情（表情包左下 = 怀疑）
+    // 皮探长神秘表情（表情包左下 = 怀疑，透明底）
   const piIn = easeOut(clamp01(st / 1.2));
   ctx.save();
   ctx.globalAlpha = piIn;
   if (images.piEmotions) {
+    // 暗色底衬
+    ctx.fillStyle = 'rgba(15,12,25,0.75)';
+    ctx.beginPath(); ctx.arc(W/2, H*.28, 155, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(140,90,200,0.2)';
+    ctx.lineWidth = 2; ctx.stroke();
     // 裁切左下角（怀疑表情）
     const srcX = 0, srcY = images.piEmotions.height * 0.5;
     const srcW = images.piEmotions.width * 0.5;
     const srcH = images.piEmotions.height * 0.5;
-    // 暗色底衬
-    ctx.fillStyle = 'rgba(15,12,25,0.6)';
-    ctx.beginPath(); ctx.arc(W/2, H*.28, 160, 0, Math.PI*2); ctx.fill();
     try {
       ctx.drawImage(images.piEmotions, srcX+20, srcY+20, srcW-40, srcH-40,
-        W/2-150, H*.15, 300, 300);
+        W/2-140, H*.15, 280, 280);
     } catch(e) {}
   }
   ctx.restore();
@@ -421,20 +426,23 @@ function scene5(t) {
   if (images.logo) drawImg(images.logo, W*.25, H*.1, W*.5, W*.5, 36);
   ctx.restore();
 
-  // 皮探长挥手告别（表情包右下）
+  // 皮探长挥手告别（表情包右下，透明底）
   const piIn = easeOut(clamp01((st-0.5)/0.8));
   ctx.save();
   ctx.globalAlpha = piIn;
   if (images.piEmotions) {
+    // 暗色底衬
+    ctx.fillStyle = 'rgba(15,12,25,0.7)';
+    ctx.beginPath(); ctx.arc(W*.82, H*.52, 75, 0, Math.PI*2); ctx.fill();
+    ctx.strokeStyle = 'rgba(212,168,83,0.15)';
+    ctx.lineWidth = 2; ctx.stroke();
     const srcX = images.piEmotions.width * 0.5;
     const srcY = images.piEmotions.height * 0.5;
     const srcW = images.piEmotions.width * 0.5;
     const srcH = images.piEmotions.height * 0.5;
-    ctx.fillStyle = 'rgba(15,12,25,0.5)';
-    ctx.beginPath(); ctx.arc(W*.82, H*.52, 80, 0, Math.PI*2); ctx.fill();
     try {
       ctx.drawImage(images.piEmotions, srcX+15, srcY+15, srcW-30, srcH-30,
-        W*.82-80, H*.52-80, 160, 160);
+        W*.82-75, H*.52-75, 150, 150);
     } catch(e) {}
   }
   ctx.restore();

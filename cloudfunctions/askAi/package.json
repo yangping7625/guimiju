@@ -1,0 +1,7 @@
+{
+  "name": "askAi",
+  "version": "1.0.0",
+  "description": "诡谜局 AI 问答云函数",
+  "main": "index.js",
+  "dependencies": {}
+}

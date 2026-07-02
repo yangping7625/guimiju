@@ -17,7 +17,13 @@ const TYPE_MAP = {
   twist: '🌀 叙诡反转',
   eerie: '🌙 细思极恐',
   occult: '👻 变格悬疑',
-  dark: '🖤 暗黑重口'
+  dark: '🖤 暗黑重口',
+  // AI 定制谜题类型
+  folk: '🏮 民俗怪谈',
+  dream: '💤 梦核迷境',
+  cthulhu: '🐙 克苏鲁异兆',
+  classic: '🕯️ 经典海龟汤',
+  scary: '🩸 恐怖惊悚'
 };
 
 const TYPE_CLASS = {
@@ -25,24 +31,29 @@ const TYPE_CLASS = {
   twist: 'type-twist',
   eerie: 'type-eerie',
   occult: 'type-occult',
-  dark: 'type-dark'
+  dark: 'type-dark',
+  // AI 定制谜题类型样式
+  folk: 'type-folk',
+  dream: 'type-dream',
+  cthulhu: 'type-cthulhu',
+  classic: 'type-classic',
+  scary: 'type-scary'
 };
 
 // ============ 初始化 ============
 async function initGame() {
+  // 1. 先等 CloudBase 确认登录状态（不需等 welcome 显示）
+  await waitForCloudbase();
+  // 2. 统一刷新状态（题库 + 解锁 + 登录UI）
+  await refreshStatus();
+
+  // 3. 读取最佳记录
   bestRecord = parseInt(localStorage.getItem('guimiju_best')) || null;
   if (bestRecord !== null) {
     document.getElementById('best-score').textContent = bestRecord + ' 次';
   }
 
-  // 等 CloudBase 初始化完成
-  await waitForCloudbase();
-  // 读取用户解锁状态
-  await loadUnlockStatus();
-  updateUnlockBadge();
-
-  // 构建初始谜题顺序
-  buildPuzzleOrder();
+  // 4. 确认状态后再显示欢迎页
   showScreen('screen-welcome');
 
   // 新手引导：首次访问显示
@@ -52,15 +63,25 @@ async function initGame() {
 }
 
 // ============ 分类筛选 ============
+const DEFAULT_FREE_COUNT = 30;  // 未解锁用户默认可玩的题数
+function getAvailableCount() {
+  // 已解锁全部 / GM → 全部题
+  if (unlockedPuzzles >= PUZZLES.length || currentUser.isGm) return PUZZLES.length;
+  // 未解锁 → 只给默认免费题数（不超过总题数）
+  return Math.min(DEFAULT_FREE_COUNT, PUZZLES.length);
+}
 function buildPuzzleOrder() {
   const type = state.filterType;
-  if (type === 'all') {
-    puzzleOrder = PUZZLES.map((_, i) => i);
-  } else {
-    puzzleOrder = PUZZLES
-      .map((p, i) => (p.type === type ? i : -1))
-      .filter(i => i >= 0);
+  const available = getAvailableCount();
+  // 按分类筛选，且只取前 available 题
+  const indices = [];
+  for (let i = 0; i < PUZZLES.length; i++) {
+    if (i >= available) break;  // 未解锁用户只给前 available 题
+    if (type === 'all' || PUZZLES[i].type === type) {
+      indices.push(i);
+    }
   }
+  puzzleOrder = indices;
 }
 
 function filterPuzzles(type) {
@@ -199,7 +220,7 @@ async function askQuestion() {
   else if (answer.ans === 'no') { ansClass = 'answer-no'; ansText = '否'; }
 
   aDiv.innerHTML =
-    '<div class="label">AI 回答：</div>' +
+    '<div class="label"><img src="assets/pi-detective-v1.png" alt="皮探长" class="pi-avatar" style="vertical-align:middle;margin-right:6px">AI 回答：</div>' +
     '<div class="summary"><span class="expand-icon">▶</span><span class="' + ansClass + '">' + ansText + '</span></div>' +
     '<div class="detail">' + highlightClues(esc(answer.exp)) + '</div>';
 
@@ -215,7 +236,7 @@ async function askQuestion() {
 const CLOUDBASE_ENV_ID = 'ai-native-d6gdsx2agc8c46199';
 let app = null;
 let loginReady = false;
-let currentUser = { id: null, name: '玩家', loginType: 'anonymous', isGm: false };
+let currentUser = { id: null, name: '玩家', loginType: 'anonymous', isGm: false, accountId: null };
 
 // GM 内测账号白名单
 const GM_ACCOUNTS = { 'gmadmin': '内测管理员' };
@@ -226,12 +247,6 @@ function isGmUsername(username) {
 }
 
 async function initCloudbase() {
-  // GitHub Pages 上跳过 CloudBase 初始化，用 HTTP API
-  if (isGitHubPages) {
-    console.log('GitHub Pages 模式，跳过 CloudBase 初始化');
-    loginReady = true;  // 标记就绪，不阻塞游戏
-    return true;
-  }
   try {
     if (typeof cloudbase === 'undefined') {
       console.error('CloudBase SDK 未加载');
@@ -249,29 +264,36 @@ async function initCloudbase() {
       currentUser.name = u.user_metadata?.username || u.user_metadata?.name || '玩家';
       currentUser.loginType = u.is_anonymous ? 'anonymous' : 'password';
       currentUser.isGm = isGmUsername(u.user_metadata?.username || '');
+      currentUser.accountId = !u.is_anonymous ? (u.user_metadata?.username || u.email || '') : null;
       updateLoginUI();
       console.log('CloudBase 已有登录会话, loginType:', currentUser.loginType);
       return true;
     }
 
-    // 2. 尝试自动密码登录
+    // 2. 尝试自动密码登录（异常不影响后续流程）
     const savedCreds = getSavedCreds();
-    if (savedCreds) {
-      const { data, error } = await auth.signInWithPassword({
-        username: savedCreds.username,
-        password: savedCreds.password
-      });
-      if (!error && data && data.user) {
-        loginReady = true;
-        currentUser.id = data.user.id;
-        currentUser.name = data.user.user_metadata?.username || savedCreds.username;
-        currentUser.loginType = 'password';
-        currentUser.isGm = isGmUsername(savedCreds.username);
-        updateLoginUI();
-        console.log('CloudBase 自动密码登录成功');
-        return true;
+    if (savedCreds && savedCreds.username && savedCreds.password) {
+      try {
+        const isEmail = savedCreds.username.includes('@');
+        const params = isEmail
+          ? { email: savedCreds.username, password: savedCreds.password }
+          : { username: savedCreds.username, password: savedCreds.password };
+        const { data, error } = await auth.signInWithPassword(params);
+        if (!error && data && data.user) {
+          loginReady = true;
+          currentUser.id = data.user.id;
+          currentUser.name = data.user.user_metadata?.username || savedCreds.username;
+          currentUser.loginType = 'password';
+          currentUser.isGm = isGmUsername(savedCreds.username);
+          currentUser.accountId = savedCreds.username;
+          updateLoginUI();
+          console.log('CloudBase 自动密码登录成功');
+          return true;
+        }
+      } catch (autoLoginErr) {
+        console.warn('自动密码登录异常（将降级匿名登录）:', autoLoginErr.message);
       }
-      clearSavedCreds();
+      clearSavedCreds(); // 清理无效凭据
     }
 
     // 3. 降级匿名登录
@@ -309,6 +331,7 @@ async function loginWithPassword(identifier, password) {
   currentUser.name = data.user.user_metadata?.username || data.user.user_metadata?.nickname || identifier;
   currentUser.loginType = 'password';
   currentUser.isGm = isGmUsername(data.user.user_metadata?.username || identifier);
+  currentUser.accountId = data.user.user_metadata?.username || identifier;
   loginReady = true;
   updateLoginUI();
   console.log('密码登录成功, isGm:', currentUser.isGm);
@@ -338,11 +361,12 @@ const ERROR_CN = {
 };
 function transErr(msg) {
   if (!msg) return '操作失败';
-  const lower = msg.toLowerCase();
+  const str = String(msg);
+  const lower = str.toLowerCase();
   for (const [key, val] of Object.entries(ERROR_CN)) {
     if (lower.includes(key)) return val;
   }
-  return msg;
+  return str;
 }
 
 // ============ 注册流程 ============
@@ -365,11 +389,14 @@ async function handleSendVerifyCode() {
   if (!agree) { errEl.textContent = '请先同意隐私政策和服务协议'; return; }
   if (codeCooldown > 0) { errEl.textContent = '请 ' + codeCooldown + ' 秒后再试'; return; }
 
+  const emailStr = String(email);
+  const usernameStr = String(username);
+
   btn.disabled = true; btn.textContent = '发送中...';
   try {
     const auth = app.auth;
     // 第一步：发起邮箱注册，CloudBase 会发送验证码
-    const { data, error } = await auth.signUp({ email, password, username, nickname: username });
+    const { data, error } = await auth.signUp({ email: emailStr, password, username: usernameStr, nickname: usernameStr });
     if (error) { errEl.textContent = transErr(error.message) || '发送验证码失败'; btn.disabled = false; btn.textContent = '发送验证码'; return; }
     // data 包含 verifyOtp 方法，用于验证验证码
     registerSignUpResult = data;
@@ -383,7 +410,7 @@ async function handleSendVerifyCode() {
       if (codeCooldown <= 0) { clearInterval(timer); btn.textContent = '重新发送'; btn.disabled = false; }
     }, 1000);
   } catch (e) {
-    errEl.textContent = transErr(e.message) || '发送失败';
+    errEl.textContent = transErr((e && e.message) ? String(e.message) : '') || '发送失败';
     btn.disabled = false; btn.textContent = '发送验证码';
   }
 }
@@ -415,6 +442,7 @@ async function handleSignUp() {
       currentUser.name = username;
       currentUser.loginType = 'password';
       currentUser.isGm = isGmUsername(username);
+      currentUser.accountId = username || email;
       loginReady = true;
       onSignUpSuccess(username);
       return;
@@ -422,7 +450,7 @@ async function handleSignUp() {
     errEl.textContent = '验证成功但未返回用户信息，请重试';
     btn.disabled = false; btn.textContent = '注册并登录';
   } catch (e) {
-    errEl.textContent = transErr(e.message) || '注册失败';
+    errEl.textContent = transErr((e && e.message) ? String(e.message) : '') || '注册失败';
     btn.disabled = false; btn.textContent = '注册并登录';
   }
 }
@@ -523,6 +551,7 @@ async function logout() {
   currentUser.name = '玩家';
   currentUser.loginType = 'anonymous';
   currentUser.isGm = false;
+  currentUser.accountId = '';  // 清除账号 ID，防止数据库误恢复
   updateLoginUI();
   showToast('已退出登录');
 }
@@ -538,12 +567,6 @@ function clearSavedCreds() {
   try { localStorage.removeItem('guimiju_v1_cred'); } catch (e) {}
 }
 
-// ============ API 端点检测 ============
-// GitHub Pages 上用 CloudRun 代理，CloudBase 上用云函数
-const API_PROXY_URL = 'https://api-proxy-276064-5-1448179936.sh.run.tcloudbase.com';
-const isGitHubPages = window.location.hostname.includes('github.io');
-const isCloudBase = window.location.hostname.includes('tcloudbaseapp.com');
-
 // ============ API 调用 ============
 async function answerQuestion(question) {
   try {
@@ -555,19 +578,6 @@ async function answerQuestion(question) {
       history: history
     };
 
-    // GitHub Pages → CloudRun HTTP API
-    if (isGitHubPages) {
-      const resp = await fetch(API_PROXY_URL + '/api/ask', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(payload)
-      });
-      const data = await resp.json();
-      if (data.error) throw new Error(data.error);
-      return data;
-    }
-
-    // CloudBase → 云函数
     if (!loginReady && app) {
       await initCloudbase();
     }
@@ -594,33 +604,88 @@ initCloudbase();
 let unlockedPuzzles = 0;  // 已解锁谜题数（从数据库/localStorage读取）
 
 async function loadUnlockStatus() {
-  // 先查 localStorage
-  const local = localStorage.getItem('guimiju_unlocked');
-  if (local === 'true') { unlockedPuzzles = PUZZLES.length; return; }
+  // 核心原则：localStorage 是解锁状态的权威来源（同一浏览器跨身份共享）
+  // 数据库只做云端备份和跨设备同步
 
-  // 再查数据库
-  if (loginReady && app) {
+  const localUnlocked = localStorage.getItem('guimiju_unlocked') === 'true';
+
+  // 1️⃣ localStorage 有值 + 已登录密码用户 → 信任
+  if (localUnlocked && currentUser.loginType === 'password') {
+    unlockedPuzzles = PUZZLES.length;
+    // 异步确保云端也有记录（跨设备恢复用）
+    ensureCloudUnlock().catch(() => {});
+    return;
+  }
+
+  // 2️⃣ localStorage 无值 → 尝试从数据库恢复（仅密码用户支持跨设备）
+  if (loginReady && app && currentUser.accountId) {
     try {
       const db = app.database();
-      const result = await db.collection('user_unlocks')
-        .where({ productId: 'redeem_unlock_all' })
+      const dbResult = await db.collection('user_unlocks')
+        .where({ productId: 'unlock_all_90', accountId: currentUser.accountId })
         .limit(1)
         .get();
-      if (result.data && result.data.length > 0) {
+      if (dbResult && dbResult.data && dbResult.data.length > 0) {
         unlockedPuzzles = PUZZLES.length;
         localStorage.setItem('guimiju_unlocked', 'true');
         return;
       }
-    } catch (e) { console.warn('读取解锁状态失败:', e.message); }
+    } catch (e) {
+      console.warn('读取解锁状态失败（数据库）:', e.message);
+    }
   }
+
+  // 3️⃣ 都没有 → 未解锁
   unlockedPuzzles = 0;
 }
 
-function showRedeemModal() {
-  if (isGitHubPages) {
-    showToast('🎫 兑换码功能请访问官网：\nguimiju.tcloudbaseapp.com', 'info');
-    return;
+// 确保云端有当前身份的解锁记录（用于跨设备恢复）
+async function ensureCloudUnlock() {
+  if (!loginReady || !app) return;
+  try {
+    const db = app.database();
+    const collection = db.collection('user_unlocks');
+    
+    if (currentUser.accountId) {
+      // 密码用户：查自己的记录
+      const result = await collection
+        .where({ productId: 'unlock_all_90', accountId: currentUser.accountId })
+        .limit(1)
+        .get();
+      
+      if (result.data && result.data.length > 0) {
+        return; // 已有记录
+      }
+      
+      // 无记录 → 新建
+      await collection.add({
+        productId: 'unlock_all_90',
+        accountId: currentUser.accountId,
+        unlockedAt: new Date().toISOString(),
+        source: 'local_sync'
+      });
+      console.log('✅ 已为密码用户创建解锁记录, accountId:', currentUser.accountId);
+    } else {
+      // 匿名用户：仅在有 localStorage 时补写
+      const result = await collection
+        .where({ productId: 'unlock_all_90' })
+        .limit(1)
+        .get();
+      if (!result.data || result.data.length === 0) {
+        await collection.add({
+          productId: 'unlock_all_90',
+          unlockedAt: new Date().toISOString(),
+          source: 'local_sync'
+        });
+        console.log('✅ 已补写匿名解锁记录');
+      }
+    }
+  } catch (e) {
+    console.warn('补写解锁记录失败:', e.message);
   }
+}
+
+function showRedeemModal() {
   document.getElementById('modal-redeem').classList.remove('hidden');
   document.getElementById('redeem-code-input').value = '';
   document.getElementById('redeem-error').textContent = '';
@@ -641,19 +706,59 @@ async function handleRedeem() {
 
   if (!code || code.length < 6) { errEl.textContent = '请输入有效兑换码'; return; }
 
+  // 确保 CloudBase 已初始化并登录
+  if (!loginReady || !app) {
+    errEl.textContent = '正在连接服务器，请稍后再试...';
+    await initCloudbase();
+    if (!loginReady || !app) {
+      errEl.textContent = '连接失败，请刷新页面后重试';
+      return;
+    }
+  }
+
   btn.disabled = true; btn.textContent = '验证中...';
 
   try {
+    // 🔍 诊断日志
+    console.log('=== handleRedeem 诊断 ===');
+    console.log('loginReady:', loginReady);
+    console.log('app 类型:', typeof app);
+    console.log('app.callFunction 类型:', typeof app?.callFunction);
+    console.log('currentUser:', JSON.stringify(currentUser));
+    console.log('cloudbase 全局:', typeof cloudbase);
+    console.log('=======================');
+
+    // 二次确认 CloudBase 可用
+    if (!app || typeof app.callFunction !== 'function') {
+      throw new Error('CloudBase SDK 未就绪，请刷新页面');
+    }
+    if (!currentUser.id) {
+      // 重新尝试匿名登录
+      await initCloudbase();
+      if (!currentUser.id) {
+        throw new Error('无法获取用户标识，请刷新页面');
+      }
+    }
+
+    console.log('即将调用 app.callFunction, 参数:', { name: 'handlePayment', data: { action: 'redeemCode', code, _uid: currentUser.id } });
+
+    // 显式传入用户标识，防止云函数 context.OPENID 为空
     const result = await app.callFunction({
       name: 'handlePayment',
-      data: { action: 'redeemCode', code }
+      data: { action: 'redeemCode', code, _uid: currentUser.id, _loginType: currentUser.loginType, _accountId: currentUser.accountId || '' }
     });
+
+    console.log('app.callFunction 返回:', result);
 
     const res = result.result || {};
     if (res.code === 0) {
       unlockedPuzzles = PUZZLES.length;
       localStorage.setItem('guimiju_unlocked', 'true');
+      // 异步确保云端有记录（跨设备恢复用）
+      ensureCloudUnlock().catch(() => {});
       updateUnlockBadge();
+      buildPuzzleOrder();
+      document.getElementById('total-puzzles').textContent = puzzleOrder.length;
       succEl.style.display = 'block';
       succEl.textContent = '✅ 兑换成功！全部 ' + PUZZLES.length + ' 道谜题已解锁';
       playUnlockSound();
@@ -662,22 +767,74 @@ async function handleRedeem() {
       errEl.textContent = res.message || '兑换码无效或已使用';
     }
   } catch (e) {
-    errEl.textContent = '网络错误，请重试';
-    console.error('兑换失败:', e);
+    const errMsg = e.message || String(e);
+    const errStack = e.stack || '';
+    console.error('兑换失败 - 完整错误:', e);
+    console.error('错误消息:', errMsg);
+    console.error('错误堆栈:', errStack);
+    console.error('错误类型:', typeof e, e.constructor?.name);
+    // 显示更具体的错误信息
+    if (errMsg.includes('timeout') || errMsg.includes('超时')) {
+      errEl.textContent = '请求超时，请检查网络后重试';
+    } else if (errMsg.includes('not function') || errMsg.includes('callFunction')) {
+      errEl.textContent = '服务未就绪，请刷新页面后重试';
+    } else {
+      errEl.textContent = '网络错误: ' + errMsg;
+    }
   }
 
   btn.disabled = false; btn.textContent = '兑换';
 }
 
+// 统一刷新状态：题库数 + 解锁徽章 + AI定制按钮
+async function refreshStatus() {
+  // 1. 重新读取解锁状态（localStorage + 数据库）
+  await loadUnlockStatus();
+  // 2. 匿名用户强制归零（未登录 = 未解锁）
+  if (!currentUser || currentUser.loginType === 'anonymous') {
+    unlockedPuzzles = 0;
+  }
+  // 3. 更新 UI
+  updateUnlockBadge();
+  buildPuzzleOrder();
+  document.getElementById('total-puzzles').textContent = puzzleOrder.length;
+  // 4. 更新登录状态显示
+  updateLoginUI();
+  // 5. toast 提示
+  const isUnlocked = unlockedPuzzles >= PUZZLES.length || currentUser.isGm;
+  if (isUnlocked) {
+    showToast('✅ 已激活 · 题库 ' + PUZZLES.length + ' 题');
+  } else {
+    showToast('📋 当前题库 ' + puzzleOrder.length + ' 题 · 登录后解锁更多');
+  }
+}
+
 function updateUnlockBadge() {
   const badge = document.getElementById('unlock-badge');
-  if (!badge) return;
-  if (unlockedPuzzles >= PUZZLES.length) {
-    badge.textContent = '🔓 已解锁全部 ' + PUZZLES.length + ' 道谜题';
-    badge.className = 'unlock-badge unlocked';
-  } else {
-    badge.textContent = '🎫 输入兑换码解锁全部谜题';
-    badge.className = 'unlock-badge locked';
+  const genBtn = document.getElementById('btn-gen-submit');
+  const isUnlocked = unlockedPuzzles >= PUZZLES.length || currentUser.isGm;
+
+  if (badge) {
+    if (isUnlocked) {
+      badge.innerHTML = '<img src="assets/pi-detective-v1.png" alt="皮探长" class="pi-avatar" style="vertical-align:middle;margin-right:6px">🔓 已解锁全部 ' + PUZZLES.length + ' 道谜题';
+      badge.className = 'unlock-badge unlocked';
+    } else {
+      badge.innerHTML = '<img src="assets/pi-detective-v1.png" alt="皮探长" class="pi-avatar" style="vertical-align:middle;margin-right:6px">输入兑换码解锁全部谜题';
+      badge.className = 'unlock-badge locked';
+    }
+  }
+
+  // AI 定制谜题按钮状态联动
+  if (genBtn) {
+    if (isUnlocked) {
+      genBtn.disabled = false;
+      genBtn.textContent = '🤖 开始生成';
+      genBtn.style.opacity = '1';
+    } else {
+      genBtn.disabled = true;
+      genBtn.textContent = '🔒 解锁后可用';
+      genBtn.style.opacity = '0.5';
+    }
   }
 }
 
@@ -716,9 +873,10 @@ function getDailySeed() {
 
 function getDailyPuzzleIndex() {
   const seed = getDailySeed();
-  // 伪随机：用日期作为种子选一道题
+  // 伪随机：用日期作为种子选一道题（限制在用户可用的题目范围内）
   const hash = (seed * 2654435761) >>> 0;
-  return hash % PUZZLES.length;
+  const pool = getAvailableCount();
+  return hash % pool;
 }
 
 function showDailyPuzzle() {
@@ -779,10 +937,6 @@ function updateLoginUI() {
 }
 
 function showLoginModal() {
-  if (isGitHubPages) {
-    showToast('🔑 登录功能请访问官网：\nguimiju.tcloudbaseapp.com', 'info');
-    return;
-  }
   if (currentUser.loginType === 'password') {
     showAccountModal();
     return;
@@ -803,6 +957,8 @@ function showAccountModal() {
   if (gmInfo) gmInfo.style.display = currentUser.isGm ? '' : 'none';
   const logoutBtn = document.getElementById('btn-v1-logout');
   if (logoutBtn) logoutBtn.style.display = currentUser.loginType === 'password' ? '' : 'none';
+  const changePwdBtn = document.getElementById('btn-v1-changepwd');
+  if (changePwdBtn) changePwdBtn.style.display = currentUser.loginType === 'password' ? '' : 'none';
   document.getElementById('modal-v1-account').classList.remove('hidden');
 }
 
@@ -813,16 +969,99 @@ function hideAccountModal() {
 // ============ 重置密码 ============
 function showResetPwdModal() {
   hideLoginModal();
+  resetPwdState = null;
+  resetPwdCooldown = 0;
   document.getElementById('modal-v1-resetpwd').classList.remove('hidden');
+  // 回到第一步
+  document.getElementById('v1-resetpwd-step1').style.display = 'block';
+  document.getElementById('v1-resetpwd-step2').style.display = 'none';
   document.getElementById('v1-resetpwd-error').textContent = '';
   document.getElementById('v1-resetpwd-success').style.display = 'none';
   document.getElementById('v1-resetpwd-email').value = '';
-  document.getElementById('btn-v1-resetpwd-submit').disabled = false;
+  document.getElementById('v1-resetpwd-code').value = '';
+  document.getElementById('v1-resetpwd-newpwd').value = '';
+  const btn = document.getElementById('btn-v1-resetpwd-submit');
+  btn.disabled = false;
+  btn.textContent = '发送验证码';
 }
 
 function hideResetPwdModal() {
   document.getElementById('modal-v1-resetpwd').classList.add('hidden');
 }
+
+
+
+
+// ============ 修改密码 ============
+function showChangePwdModal() {
+  document.getElementById('v1-changepwd-old').value = '';
+  document.getElementById('v1-changepwd-new').value = '';
+  document.getElementById('v1-changepwd-new2').value = '';
+  document.getElementById('v1-changepwd-error').textContent = '';
+  document.getElementById('v1-changepwd-success').style.display = 'none';
+  document.getElementById('modal-v1-changepwd').classList.remove('hidden');
+}
+
+function hideChangePwdModal() {
+  document.getElementById('modal-v1-changepwd').classList.add('hidden');
+}
+
+async function handleChangePassword() {
+  const oldPwd = document.getElementById('v1-changepwd-old').value;
+  const newPwd = document.getElementById('v1-changepwd-new').value;
+  const newPwd2 = document.getElementById('v1-changepwd-new2').value;
+  const errEl = document.getElementById('v1-changepwd-error');
+  const succEl = document.getElementById('v1-changepwd-success');
+  errEl.textContent = '';
+  succEl.style.display = 'none';
+
+  if (!oldPwd) { errEl.textContent = '请输入当前密码'; return; }
+  if (!newPwd || newPwd.length < 6) { errEl.textContent = '新密码至少6位'; return; }
+  if (newPwd !== newPwd2) { errEl.textContent = '两次输入的新密码不一致'; return; }
+
+  const btn = document.getElementById('btn-v1-changepwd-submit');
+  btn.disabled = true;
+  btn.textContent = '修改中...';
+
+  try {
+    if (!app || !app.auth) {
+      await initCloudbase();
+      if (!app || !app.auth) throw new Error('服务未就绪');
+    }
+
+    // CloudBase SDK v2 修改密码 API：resetPasswordForOld
+    const { error } = await app.auth.resetPasswordForOld({
+      old_password: oldPwd,
+      new_password: newPwd
+    });
+
+    if (error) {
+      const errMsg = (error && error.message) ? String(error.message) : '';
+      errEl.textContent = transErr(errMsg) || '修改失败，请检查当前密码是否正确';
+      btn.disabled = false;
+      btn.textContent = '确认修改';
+      return;
+    }
+
+    // 修改成功，更新本地保存的密码
+    saveCreds(currentUser.name, newPwd);
+    succEl.style.display = 'block';
+    succEl.textContent = '✅ 密码修改成功！';
+    btn.textContent = '已修改';
+    setTimeout(() => {
+      hideChangePwdModal();
+      showAccountModal();
+    }, 2000);
+  } catch (e) {
+    console.error('修改密码异常:', e);
+    const errMsg = (e && e.message) ? String(e.message) : String(e || '');
+    errEl.textContent = transErr(errMsg) || '修改失败，请稍后重试';
+    btn.disabled = false;
+    btn.textContent = '确认修改';
+  }
+}
+
+
 
 async function handleResetPassword() {
   const email = document.getElementById('v1-resetpwd-email').value.trim();
@@ -831,21 +1070,137 @@ async function handleResetPassword() {
   errEl.textContent = '';
   succEl.style.display = 'none';
 
-  if (!email || !email.includes('@')) { errEl.textContent = '请输入有效邮箱'; return; }
+  if (!email || !String(email).includes('@')) { errEl.textContent = '请输入有效邮箱'; return; }
 
+  if (resetPwdCooldown > 0) { errEl.textContent = '请 ' + resetPwdCooldown + ' 秒后再试'; return; }
+
+  const emailStr = String(email);
   const btn = document.getElementById('btn-v1-resetpwd-submit');
   btn.disabled = true; btn.textContent = '发送中...';
 
   try {
+    if (!app || !app.auth) {
+      await initCloudbase();
+      if (!app || !app.auth) {
+        throw new Error('服务未就绪，请刷新页面');
+      }
+    }
     const auth = app.auth;
-    const { error } = await auth.sendPasswordResetEmail({ email });
-    if (error) { errEl.textContent = transErr(error.message) || '发送失败，请检查邮箱是否正确'; btn.disabled = false; btn.textContent = '发送重置邮件'; return; }
+
+    // CloudBase SDK v2 忘记密码：sendPasswordResetEmail 发送重置邮件
+    // 返回 { data, error }，data 可能为 undefined（发送成功时无额外数据）
+    const result = await auth.sendPasswordResetEmail(emailStr);
+
+    // SDK 可能直接返回结果，也可能返回 { data, error }
+    const error = result && result.error ? result.error : null;
+
+    if (error) {
+      const errMsg = (error && error.message) ? String(error.message) : '';
+      errEl.textContent = transErr(errMsg) || '发送失败，请检查邮箱是否正确';
+      btn.disabled = false;
+      btn.textContent = '发送验证码';
+      return;
+    }
+
+    // 发送成功，保存返回的 data（含 updateUser 函数用于第二步验证码验证）
+    const data = result && result.data ? result.data : (result && !result.error ? result : null);
+    if (data && typeof data.updateUser === 'function') {
+      resetPwdState = { email: emailStr, updateUser: data.updateUser };
+    } else {
+      resetPwdState = { email: emailStr, updateUser: null, resetLinkSent: true };
+    }
+
+    // 60秒冷却
+    resetPwdCooldown = 60;
+    btn.textContent = resetPwdCooldown + 's';
+    const timer = setInterval(() => {
+      resetPwdCooldown--;
+      btn.textContent = resetPwdCooldown > 0 ? resetPwdCooldown + 's' : '重新发送';
+      if (resetPwdCooldown <= 0) { clearInterval(timer); btn.disabled = false; }
+    }, 1000);
+
+    // 隐藏邮箱输入，显示验证码+新密码
+    document.getElementById('v1-resetpwd-step1').style.display = 'none';
+    document.getElementById('v1-resetpwd-step2').style.display = 'block';
     succEl.style.display = 'block';
-    succEl.textContent = '重置链接已发送至 ' + email + '，请查收邮件（可能被归入垃圾箱）。';
-    btn.textContent = '已发送';
+    succEl.textContent = '✅ 验证码已发送至 ' + emailStr + '，请输入邮件中的6位验证码并设置新密码。';
   } catch (e) {
-    errEl.textContent = transErr(e.message) || '发送失败，请稍后重试';
-    btn.disabled = false; btn.textContent = '发送重置邮件';
+    console.error('重置密码异常:', e);
+    const errMsg = (e && e.message) ? String(e.message) : String(e || '');
+    errEl.textContent = transErr(errMsg) || '发送失败，请稍后重试';
+    btn.disabled = false;
+    btn.textContent = '发送验证码';
+  }
+}
+
+let resetPwdState = null; // { email, updateUser }
+let resetPwdCooldown = 0; // 发送验证码冷却秒数
+
+async function handleResetPwdConfirm() {
+  const code = document.getElementById('v1-resetpwd-code').value.trim();
+  const newPwd = document.getElementById('v1-resetpwd-newpwd').value;
+  // 第二步有自己的 error/success 元素（HTML 里是 -error2 / -success2）
+  const errEl = document.getElementById('v1-resetpwd-error2');
+  const succEl = document.getElementById('v1-resetpwd-success2');
+
+  errEl.style.display = 'none';
+  errEl.textContent = '';
+  succEl.style.display = 'none';
+
+  // 如果 sendPasswordResetEmail 发的是链接而非验证码，则提示用户
+  if (resetPwdState && resetPwdState.resetLinkSent) {
+    succEl.style.display = 'block';
+    succEl.textContent = '请查收邮件中的重置链接，点击链接即可设置新密码。';
+    return;
+  }
+
+  if (!code || code.length !== 6) { errEl.textContent = '请输入6位验证码'; errEl.style.display = 'block'; return; }
+  if (!newPwd || newPwd.length < 6) { errEl.textContent = '新密码至少6位'; errEl.style.display = 'block'; return; }
+  if (!resetPwdState || typeof resetPwdState.updateUser !== 'function') {
+    errEl.textContent = '请先发送验证码';
+    errEl.style.display = 'block';
+    return;
+  }
+
+  const btn = document.getElementById('btn-v1-resetpwd-confirm');
+  btn.disabled = true;
+  btn.textContent = '重置中...';
+
+  try {
+    // CloudBase 忘记密码第二步：调用 data.updateUser({ nonce: 验证码, password: 新密码 })
+    const result = await resetPwdState.updateUser({
+      nonce: code,
+      password: newPwd
+    });
+    const updateError = (result && result.error) ? result.error : null;
+
+    if (updateError) {
+      const errMsg = (updateError && updateError.message) ? String(updateError.message) : '';
+      errEl.textContent = transErr(errMsg) || '验证码错误或重置失败';
+      errEl.style.display = 'block';
+      btn.disabled = false;
+      btn.textContent = '确认重置';
+      return;
+    }
+
+    // 密码重置成功
+    saveCreds(resetPwdState.email, newPwd);
+    succEl.style.display = 'block';
+    succEl.textContent = '密码重置成功！3秒后返回登录页...';
+    btn.textContent = '已重置';
+    resetPwdState = null;
+    // 自动跳转登录页
+    setTimeout(() => {
+      hideResetPwdModal();
+      showLoginModal();
+    }, 3000);
+  } catch (e) {
+    console.error('重置密码确认异常:', e);
+    const errMsg = (e && e.message) ? String(e.message) : String(e || '');
+    errEl.textContent = transErr(errMsg) || '重置失败，请稍后重试';
+    errEl.style.display = 'block';
+    btn.disabled = false;
+    btn.textContent = '确认重置';
   }
 }
 
@@ -861,11 +1216,7 @@ async function handleLogin() {
   if (result.ok) {
     hideLoginModal();
     showToast('登录成功！' + (currentUser.isGm ? ' ⭐GM' : ''));
-    updateLoginUI();
-    await loadUnlockStatus();
-    updateUnlockBadge();
-    buildPuzzleOrder();
-    document.getElementById('total-puzzles').textContent = puzzleOrder.length;
+    await refreshStatus();
   } else {
     errEl.textContent = result.error || '登录失败';
   }
@@ -890,11 +1241,12 @@ function showRegisterModal() {
 async function handleLogout() {
   hideAccountModal();
   await logout();
-  updateLoginUI();
-  await loadUnlockStatus();
+  // 退出后直接设为未解锁，等下次登录再判断
+  unlockedPuzzles = 0;
   updateUnlockBadge();
   buildPuzzleOrder();
   document.getElementById('total-puzzles').textContent = puzzleOrder.length;
+  showToast('📋 当前题库 ' + puzzleOrder.length + ' 题 · 登录后解锁更多');
 }
 
 // ============ 猜答案 / 放弃 ============
@@ -1465,6 +1817,11 @@ let genLoading = false;
 
 async function showGenScreen() {
   playClick();
+  // 检查是否已激活兑换码（GM 也允许）
+  if (unlockedPuzzles < PUZZLES.length && !currentUser.isGm) {
+    showToast('🎫 请先使用兑换码解锁全部谜题\n才能使用 AI 定制谜题功能', 'info');
+    return;
+  }
   showScreen('screen-gen');
 }
 
@@ -1517,7 +1874,25 @@ async function doGenPuzzle() {
       state.won = false;
       state.givenUp = false;
       showScreen('screen-game');
-      setupGameUI();
+
+      // 更新游戏 UI（复用 loadPuzzle 中的逻辑）
+      document.getElementById('puzzle-num').textContent = 'AI';
+      document.getElementById('q-count').textContent = '0';
+      document.getElementById('q-submit').disabled = false;
+      document.getElementById('q-input').disabled = false;
+      document.getElementById('q-input').value = '';
+
+      const typeEl = document.getElementById('riddle-type');
+      typeEl.textContent = TYPE_MAP[customPuzzle.type] || '🤖 AI定制';
+      typeEl.className = 'riddle-type ' + (TYPE_CLASS[customPuzzle.type] || 'type-folk');
+
+      document.getElementById('riddle-title').textContent = customPuzzle.title;
+      document.getElementById('riddle-text').textContent = customPuzzle.riddle;
+      document.getElementById('riddle-hint').textContent = '💡 提示：' + customPuzzle.hints[0];
+
+      const history = document.getElementById('q-history');
+      history.innerHTML = '<div class="empty-qa"><div class="icon">🤖</div><div>AI 为你定制了专属谜题<br>开始向 AI 提问吧！</div></div>';
+
       showToast('AI 已为你定制专属谜题！', 'success');
     } else {
       if (status) status.textContent = '❌ ' + (data?.error || '生成失败，请重试');
@@ -1534,7 +1909,7 @@ async function doGenPuzzle() {
 }
 
 function backToMenuFromGen() {
-  showScreen('screen-menu');
+  showScreen('screen-welcome');
 }
 
 // ============ V2 预览入口 ============

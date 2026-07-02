@@ -132,19 +132,21 @@ p{font-size:13px;color:#8a7a6a;line-height:1.8;margin-bottom:20px}
       btn.disabled = true;
       btn.textContent = '处理中...';
 
-      // 标记支付完成
-      const db = app.database();
-      await db.collection('orders')
-        .where({ orderId })
-        .update({ status: 'paid', paidAt: new Date() });
+      try {
+        // 通过云函数完成支付（防重 + 统一日志）
+        const result = await app.callFunction({
+          name: 'handlePayment',
+          data: { action: 'mockPay', orderId }
+        });
+        if (result.result && result.result.code === 0) {
+          showState('✅', '解锁成功！', '全部90道谜题已解锁！返回游戏开始挑战吧');
+        } else {
+          showState('❌', '解锁失败', (result.result && result.result.message) || '请稍后重试');
+        }
+      } catch (e) {
+        showState('❌', '网络错误', '请检查网络后重试');
+      }
 
-      // 写入解锁记录
-      await db.collection('user_unlocks').add({
-        productId: 'unlock_all_90',
-        unlockedAt: new Date()
-      });
-
-      showState('✅', '解锁成功！', '全部90道谜题已解锁！返回游戏开始挑战吧');
       btn.remove();
     };
     document.querySelector('.card').appendChild(btn);
