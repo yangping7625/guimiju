@@ -8,6 +8,16 @@ gh-pages/
 # 敏感信息 — 云函数里如果有本地 .env 不提交
 cloudfunctions/**/.env
 
+# 敏感文件 — 商业方案/推广/后台，不上 GitHub
+多人联机产品方案.md
+并行开发交付指南.md
+推广方案.md
+推广素材-完整内容包.md
+admin-redeem.html
+promo-animation.html
+server.js
+pay-confirm.html
+
 # IDE
 .vscode/
 .idea/
