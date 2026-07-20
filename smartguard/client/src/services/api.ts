@@ -1,7 +1,20 @@
 import axios from 'axios';
 import type { Scene, Device, Alert, Order, StatOverview, MetricSeries } from '../types';
 
-const api = axios.create({ baseURL: '' });
+const BASE = import.meta.env.VITE_API_BASE ?? '';
+const api = axios.create({ baseURL: BASE });
+
+// 后端不可达时通知 UI 显示提示横幅（不阻断页面渲染）
+api.interceptors.response.use(
+  (r) => r,
+  (err) => {
+    const msg = String(err?.message || '');
+    if (err?.code === 'ERR_NETWORK' || /network error|timeout/i.test(msg)) {
+      window.dispatchEvent(new CustomEvent('sg:backend-down'));
+    }
+    return Promise.reject(err);
+  }
+);
 
 const unwrap = <T,>(p: Promise<{ data: { code: number; data: T } }>): Promise<T> =>
   p.then((r) => r.data.data);
