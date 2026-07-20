@@ -1,0 +1,20 @@
+# 智维通 SmartGuard · Render 一体部署配置（前端+后端单进程）
+# 部署方式：Render 控制台 → New → Blueprint → 连接 guimiju 仓库 → Root Directory 填 smartguard
+# Render 会自动读取本文件并创建下方 Web Service。
+services:
+  - type: web
+    name: zhiweitong-smartguard
+    rootDir: smartguard/server
+    # 构建：先装后端依赖，再进入 client 装前端依赖并打包（产物落入 client/dist，由后端托管）
+    buildCommand: npm install && npm run build
+    startCommand: npm start
+    # 自动随 GitHub 推送重新部署
+    autoDeploy: true
+    healthCheckPath: /api/health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      # DeepSeek Key：在 Render 控制台手动填入；留空则 AI 诊断走规则兜底，不影响演示
+      - key: DEEPSEEK_API_KEY
+        sync: false
+    # 免费版会在无流量 15 分钟后休眠，演示前先访问一次唤醒即可
