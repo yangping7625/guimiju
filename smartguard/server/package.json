@@ -1,17 +1,16 @@
 {
   "name": "smartguard-server",
   "version": "1.0.0",
-  "description": "智维通 · 工业设备智能运维平台 - 后端服务",
+  "description": "智维通 · 工业设备智能运维平台 - 后端服务（SQLite 版）",
   "main": "index.js",
   "scripts": {
-    "start": "node index.js",
-    "dev": "nodemon index.js"
+    "start": "node --experimental-sqlite index.js",
+    "dev": "nodemon --experimental-sqlite index.js"
   },
   "dependencies": {
     "cors": "^2.8.5",
     "dotenv": "^16.4.5",
     "express": "^4.21.0",
-    "mysql2": "^3.11.0",
     "socket.io": "^4.7.5"
   },
   "devDependencies": {

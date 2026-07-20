@@ -2,7 +2,7 @@
 // 路由层只负责"谁访问什么地址"，具体做什么由这里处理
 // 分层的好处：如果以后要换框架（如从 Express 换 Koa），只改路由层就行
 
-const { pool } = require('../db');
+const { query } = require('../db');
 
 const deviceController = {
   // ─── 获取设备列表 ──────────────────
@@ -16,8 +16,8 @@ const deviceController = {
 
       // 同时查总数和当前页数据
       // Promise.all 让两个查询并行跑，不用等一个跑完再跑另一个
-      const [countResult] = await pool.query('SELECT COUNT(*) as total FROM devices');
-      const [rows] = await pool.query(
+      const [countResult] = await query('SELECT COUNT(*) as total FROM devices');
+      const [rows] = await query(
         'SELECT * FROM devices ORDER BY created_at DESC LIMIT ? OFFSET ?',
         [pageSize, offset]
       );
@@ -42,7 +42,7 @@ const deviceController = {
   async detail(req, res) {
     try {
       const { id } = req.params;
-      const [rows] = await pool.query('SELECT * FROM devices WHERE id = ?', [id]);
+      const [rows] = await query('SELECT * FROM devices WHERE id = ?', [id]);
 
       if (rows.length === 0) {
         return res.status(404).json({ code: 404, message: '设备不存在' });
@@ -67,7 +67,7 @@ const deviceController = {
         return res.status(400).json({ code: 400, message: '设备名称和类型不能为空' });
       }
 
-      const [result] = await pool.query(
+      const [result] = await query(
         'INSERT INTO devices (name, type, location, status) VALUES (?, ?, ?, ?)',
         [name, type, location, status]
       );
@@ -91,7 +91,7 @@ const deviceController = {
       const { name, type, location, status } = req.body;
 
       // 先确认设备存在
-      const [existing] = await pool.query('SELECT id FROM devices WHERE id = ?', [id]);
+      const [existing] = await query('SELECT id FROM devices WHERE id = ?', [id]);
       if (existing.length === 0) {
         return res.status(404).json({ code: 404, message: '设备不存在' });
       }
@@ -109,7 +109,7 @@ const deviceController = {
       }
 
       values.push(id);
-      await pool.query(`UPDATE devices SET ${fields.join(', ')} WHERE id = ?`, values);
+      await query(`UPDATE devices SET ${fields.join(', ')} WHERE id = ?`, values);
 
       res.json({ code: 0, message: '设备更新成功' });
     } catch (error) {
@@ -124,7 +124,7 @@ const deviceController = {
     try {
       const { id } = req.params;
 
-      const [result] = await pool.query('DELETE FROM devices WHERE id = ?', [id]);
+      const [result] = await query('DELETE FROM devices WHERE id = ?', [id]);
 
       if (result.affectedRows === 0) {
         return res.status(404).json({ code: 404, message: '设备不存在' });

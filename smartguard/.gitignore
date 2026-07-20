@@ -1,0 +1,22 @@
+# 依赖
+node_modules/
+client/node_modules/
+
+# 构建产物
+client/dist/
+
+# 本地数据库（SQLite 落盘文件，勿提交）
+server/smartguard.db
+server/smartguard.db-wal
+server/smartguard.db-shm
+*.db
+*.db-wal
+*.db-shm
+
+# 环境变量（含密钥，勿提交；可保留占位模板）
+.env
+server/.env
+
+# 日志
+*.log
+npm-debug.log*
