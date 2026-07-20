@@ -42,6 +42,8 @@
 
 *面向新能源电站和汽车产线的设备智能运维系统，多场景一键切换*
 
+🔗 **在线演示**：https://yangping7625.github.io/guimiju/（GitHub Pages 公网可访问，点顶部切换场景、点设备看实时数据、点「执行 AI 诊断」看报告）
+
 - 设计并实现「一拖二」产品架构，同一套代码支持新能源电站（光伏/储能/充电桩）和汽车产线（焊接/涂装/总装）两个场景，Top Tab 一键切换
 - 新能源版覆盖光伏阵列、逆变器、储能BMS、充电桩 12 类设备监控，汽车版覆盖焊接机器人、冲压机、涂装机器人、AGV 等 11 类产线设备
 - AI 诊断模块：对全场站/全产线设备数据做综合分析，输出健康度评分 + 异常设备列表 + 维修建议 + 趋势预测，每条建议附精确的检修时间窗口
@@ -86,6 +88,6 @@
 ## 项目补充材料
 
 - 🔗 **诡谜局线上地址**：https://ai-native-d6gdsx2agc8c46199-1448179936.tcloudbaseapp.com
-- 🖥️ **SmartGuard 原型**：`smartguard/prototype.html`（可现场演示）
+- 🌐 **SmartGuard 在线演示**：https://yangping7625.github.io/guimiju/
 - 📄 **行业分析报告**：`smartguard/新能源电站AI巡检-行业分析报告.md`
 - 🎥 **AI Agent 学习**：Langchain 工具调用 / RAG / CrewAI 多Agent / LangGraph 流式输出（进行中）

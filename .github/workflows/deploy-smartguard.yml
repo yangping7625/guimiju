@@ -1,11 +1,13 @@
-name: Deploy SmartGuard Frontend
+name: Deploy SmartGuard Prototype to Pages
+
+# 纯静态部署：直接把 prototype.html 发到 GitHub Pages（零构建、零依赖）
+# 与另三个作品集项目（ai-eval-lab / data-qc-dashboard / intern-assistant）同策略
 
 on:
   push:
     branches: [main]
     paths:
-      - 'smartguard/client/**'
-      - 'smartguard/server/**'
+      - 'smartguard/prototype.html'
       - '.github/workflows/deploy-smartguard.yml'
   workflow_dispatch:
 
@@ -15,39 +17,26 @@ permissions:
   id-token: write
 
 concurrency:
-  group: pages
+  group: pages-smartguard
   cancel-in-progress: true
 
 jobs:
-  build:
-    runs-on: ubuntu-latest
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
-        with:
-          node-version: 22
-      - name: Install & Build frontend
-        working-directory: smartguard/client
-        env:
-          # 生产前端指向 Render 后端（部署后端后自动生效）
-          VITE_API_BASE: https://zhiweitong-smartguard.onrender.com
-        run: |
-          npm install
-          npm run build -- --base /guimiju/
-      - name: Configure Pages
-        uses: actions/configure-pages@v5
-        with:
-          enablement: true
-      - uses: actions/upload-pages-artifact@v3
-        with:
-          path: smartguard/client/dist
-
   deploy:
-    needs: build
     runs-on: ubuntu-latest
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
     steps:
+      - uses: actions/checkout@v4
+
+      - name: Prepare static site
+        run: |
+          mkdir -p _site
+          cp smartguard/prototype.html _site/index.html
+
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: _site
+
       - id: deployment
         uses: actions/deploy-pages@v4
