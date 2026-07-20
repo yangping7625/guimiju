@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>智维通 SmartGuard · AI 智能运维平台</title>
+<style>
+/* ─── 全局 ─────────────────────────────── */
+* { margin:0; padding:0; box-sizing:border-box; }
+:root {
+  --primary: #00e396; --primary-dim: #1a3a2a;
+}
+body.scene-auto {
+  --primary: #57c7ff; --primary-dim: #1a2a40;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", "PingFang SC", "Microsoft YaHei", sans-serif;
+  background: #0a0e1a; color: #d0d5e0; display: flex; height: 100vh; overflow: hidden;
+}
+
+/* ─── 侧边栏 ───────────────────────────── */
+.sidebar {
+  width: 220px; background: #0d1125; border-right: 1px solid #1a2040;
+  padding: 20px 0; display: flex; flex-direction: column; flex-shrink: 0;
+}
+.logo {
+  padding: 0 20px 24px; font-size: 18px; font-weight: 700; color: var(--primary);
+  display: flex; align-items: center; gap: 10px;
+}
+.logo svg { width: 28px; height: 28px; }
+.nav-item {
+  padding: 12px 20px; cursor: pointer; display: flex; align-items: center; gap: 10px;
+  font-size: 14px; color: #8892b0; transition: all 0.2s; border-left: 3px solid transparent;
+}
+.nav-item:hover { background: #141a35; color: #ccd6f6; }
+.nav-item.active { background: #141a35; color: var(--primary); border-left-color: var(--primary); }
+.nav-item .icon { width: 18px; text-align: center; }
+.nav-section { font-size: 11px; color: #495670; padding: 16px 20px 8px; text-transform: uppercase; letter-spacing: 1px; }
+
+/* ─── 场景切换 Tab ──────────────────────── */
+.scene-tabs {
+  display: flex; gap: 4px; padding: 8px 28px; background: #0a0e1a;
+  border-bottom: 1px solid #1a2040;
+}
+.scene-tab {
+  padding: 7px 18px; border-radius: 8px 8px 0 0; cursor: pointer;
+  font-size: 13px; color: #495670; border: 1px solid transparent;
+  transition: all 0.2s; display: flex; align-items: center; gap: 6px;
+}
+.scene-tab:hover { color: #8892b0; }
+.scene-tab.active {
+  color: var(--primary); background: #0d1125;
+  border-color: #1a2040; border-bottom-color: #0d1125;
+  font-weight: 600;
+}
+.scene-tab .dot {
+  width: 7px; height: 7px; border-radius: 50%;
+}
+
+/* ─── 主内容区 ─────────────────────────── */
+.main { flex: 1; display: flex; flex-direction: column; overflow: hidden; }
+.header {
+  padding: 14px 28px; background: #0d1125; border-bottom: 1px solid #1a2040;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.header h1 { font-size: 20px; font-weight: 600; color: #e6f1ff; }
+.header .status-dot { width: 8px; height: 8px; border-radius: 50%; background: var(--primary); display: inline-block; margin-right: 6px; animation: pulse 2s infinite; }
+@keyframes pulse { 0%,100%{opacity:1} 50%{opacity:0.4} }
+.content { flex: 1; overflow-y: auto; padding: 24px 28px; }
+
+/* ─── 统计卡片 ─────────────────────────── */
+.stat-cards { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+.stat-card {
+  background: #111836; border: 1px solid #1a2040; border-radius: 10px; padding: 20px;
+  cursor: pointer; transition: all 0.2s;
+}
+.stat-card:hover { border-color: #2a3a6a; transform: translateY(-2px); }
+.stat-card .label { font-size: 13px; color: #8892b0; margin-bottom: 8px; }
+.stat-card .value { font-size: 30px; font-weight: 700; }
+.stat-card .sub { font-size: 12px; color: #495670; margin-top: 4px; }
+.card-green .value { color: #00e396; }
+.card-red .value { color: #ff5555; }
+.card-yellow .value { color: #ffb86c; }
+.card-blue .value { color: #57c7ff; }
+
+/* ─── 两栏布局 ─────────────────────────── */
+.two-col { display: grid; grid-template-columns: 1.6fr 1fr; gap: 20px; }
+
+/* ─── 面板 ─────────────────────────────── */
+.panel {
+  background: #111836; border: 1px solid #1a2040; border-radius: 10px; overflow: hidden;
+}
+.panel-header {
+  padding: 16px 20px; border-bottom: 1px solid #1a2040; font-size: 15px; font-weight: 600;
+  display: flex; justify-content: space-between; align-items: center;
+}
+.panel-body { padding: 0; overflow-x: auto; }
+
+/* ─── 表格 ─────────────────────────────── */
+table { width: 100%; border-collapse: collapse; }
+th { text-align: left; padding: 12px 20px; font-size: 12px; color: #495670; font-weight: 500; border-bottom: 1px solid #1a2040; }
+td { padding: 12px 20px; font-size: 13px; border-bottom: 1px solid #0d1125; }
+tr:hover td { background: #141a35; }
+
+/* ─── 状态标签 ─────────────────────────── */
+.badge {
+  display: inline-block; padding: 3px 10px; border-radius: 12px; font-size: 11px; font-weight: 500;
+}
+.badge-normal { background: rgba(0,227,150,0.15); color: #00e396; }
+.badge-warning { background: rgba(255,184,108,0.15); color: #ffb86c; }
+.badge-fault { background: rgba(255,85,85,0.15); color: #ff5555; }
+.badge-offline { background: rgba(73,86,112,0.15); color: #495670; }
+
+/* ─── 报警列表 ─────────────────────────── */
+.alert-item {
+  display: flex; align-items: center; padding: 14px 20px; border-bottom: 1px solid #0d1125;
+  gap: 12px; cursor: pointer; transition: background 0.15s;
+}
+.alert-item:hover { background: #141a35; }
+.alert-icon { font-size: 18px; flex-shrink: 0; }
+.alert-info { flex: 1; min-width: 0; }
+.alert-title { font-size: 13px; font-weight: 500; }
+.alert-time { font-size: 11px; color: #495670; margin-top: 2px; }
+.alert-dot { width: 6px; height: 6px; border-radius: 50%; flex-shrink: 0; }
+.dot-red { background: #ff5555; }
+.dot-yellow { background: #ffb86c; }
+
+/* ─── AI 诊断区域 ──────────────────────── */
+.ai-box {
+  margin-top: 20px; background: linear-gradient(135deg, #111836 0%, #0d2030 100%);
+  border: 1px solid #1a3a50; border-radius: 10px; padding: 20px;
+}
+.ai-box h3 { font-size: 14px; color: #57c7ff; margin-bottom: 12px; display: flex; align-items: center; gap: 8px; }
+.ai-result {
+  background: #0a1225; border-radius: 8px; padding: 16px;
+  font-size: 13px; line-height: 1.7; min-height: 60px; color: #8892b0;
+}
+.ai-result .highlight { color: #ffb86c; font-weight: 600; }
+.ai-btn {
+  margin-top: 12px; padding: 10px 24px; background: #1a3a50; color: #57c7ff;
+  border: 1px solid #2a5a80; border-radius: 8px; cursor: pointer; font-size: 13px;
+  transition: all 0.2s;
+}
+.ai-btn:hover { background: #1a4a6a; }
+
+/* ─── 响应式 ───────────────────────────── */
+@media (max-width: 1200px) { .stat-cards { grid-template-columns: repeat(2, 1fr); } .two-col { grid-template-columns: 1fr; } }
+
+/* ─── 弹窗 ─────────────────────────────── */
+.modal-overlay {
+  display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.7); z-index: 100;
+  justify-content: center; align-items: center;
+}
+.modal-overlay.show { display: flex; }
+.modal {
+  background: #111836; border: 1px solid #1a3a50; border-radius: 12px; padding: 28px;
+  width: 480px; max-height: 70vh; overflow-y: auto;
+}
+.modal h3 { font-size: 16px; color: #e6f1ff; margin-bottom: 8px; }
+.modal .device-name { color: #57c7ff; font-size: 14px; margin-bottom: 16px; }
+.modal .reading { display: flex; justify-content: space-between; padding: 10px 0; border-bottom: 1px solid #1a2040; }
+.modal .reading .metric { color: #8892b0; font-size: 13px; }
+.modal .reading .val { font-size: 14px; font-weight: 600; }
+.modal .close-btn {
+  margin-top: 16px; width: 100%; padding: 10px; background: #1a2040; color: #ccd6f6;
+  border: 1px solid #2a3a6a; border-radius: 8px; cursor: pointer; font-size: 13px;
+}
+</style>
+</head>
+<body>
+
+<!-- ─── 侧边栏 ───────────────────────────── -->
+<aside class="sidebar">
+  <div class="logo">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/></svg>
+    智维通
+  </div>
+  <div class="nav-section">监控</div>
+  <div class="nav-item active" id="navDashboard"><span class="icon">📊</span> 数据驾驶舱</div>
+  <div class="nav-item" id="navDevices"><span class="icon">📡</span> 设备管理</div>
+  <div class="nav-item" id="navMonitor"><span class="icon">⚡</span> 实时监控</div>
+  <div class="nav-section">运维</div>
+  <div class="nav-item" id="navAlerts"><span class="icon">⚠️</span> 报警中心</div>
+  <div class="nav-item" id="navOrders"><span class="icon">📋</span> 工单管理</div>
+  <div class="nav-item" id="navAI" onclick="runAIDiagnosis()"><span class="icon">🤖</span> AI 诊断</div>
+  <div class="nav-section">系统</div>
+  <div class="nav-item" id="navSettings"><span class="icon">⚙️</span> 设置</div>
+</aside>
+
+<!-- ─── 主内容区 ─────────────────────────── -->
+<main class="main">
+  <!-- 场景切换 Tab -->
+  <div class="scene-tabs">
+    <div class="scene-tab active" id="tabSolar" onclick="switchScene('solar')">
+      <span class="dot" style="background:#00e396;"></span> ☀️ 新能源电站
+    </div>
+    <div class="scene-tab" id="tabAuto" onclick="switchScene('auto')">
+      <span class="dot" style="background:#57c7ff;"></span> 🏭 汽车产线
+    </div>
+  </div>
+
+  <header class="header">
+    <h1 id="sceneTitle">📊 数据驾驶舱 · 新能源电站</h1>
+    <div><span class="status-dot"></span><span id="sceneStatus">系统运行中 · 实时数据刷新</span></div>
+  </header>
+
+  <div class="content">
+
+    <!-- 统计卡片 -->
+    <div class="stat-cards" id="statCards">
+    </div>
+
+    <!-- 两栏 -->
+    <div class="two-col">
+
+      <!-- 设备列表 -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>📡 设备列表</span>
+          <span style="font-size:12px;color:#495670;">点击设备查看实时数据</span>
+        </div>
+        <div class="panel-body">
+          <table>
+            <thead>
+              <tr><th>设备名称</th><th>类型</th><th>位置</th><th>状态</th><th>上次巡检</th></tr>
+            </thead>
+            <tbody id="deviceTable">
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <!-- 报警列表 -->
+      <div class="panel">
+        <div class="panel-header">
+          <span>⚠️ 最新报警</span>
+          <span style="font-size:12px;color:#495670;">最近 24 小时</span>
+        </div>
+        <div class="panel-body" id="alertList">
+        </div>
+      </div>
+    </div>
+
+    <!-- AI 诊断区域 -->
+    <div class="ai-box" id="aiSection">
+      <h3>🤖 AI 智能诊断</h3>
+      <div class="ai-result" id="aiResult">
+        点击下方按钮，AI 将分析全场景设备数据，生成诊断报告。
+        <br><small style="color:#495670;">基于大模型 + 传感器时序数据综合分析</small>
+      </div>
+      <button class="ai-btn" onclick="runAIDiagnosis()">▶ 执行 AI 诊断</button>
+    </div>
+
+  </div>
+</main>
+
+<!-- ─── 设备详情弹窗 ───────────────────────── -->
+<div class="modal-overlay" id="deviceModal">
+  <div class="modal" id="modalContent"></div>
+</div>
+
+<!-- ─── 脚本 ─────────────────────────────── -->
+<script>
+// ─── 场景配置 ──────────────────────────
+let currentScene = 'solar';
+let diagnosisCount = 0;
+
+// ─── 新能源电站数据 ─────────────────────
+const SOLAR = {
+  title: '📊 数据驾驶舱 · 新能源电站',
+  status: '系统运行中 · 实时数据刷新',
+  stats: [
+    { label:'📡 设备总数', value:'48', sub:'较上月 +3 台', cls:'card-green' },
+    { label:'⚠️ 异常设备', value:'3', sub:'需立即处理', cls:'card-red', filter:'alert' },
+    { label:'📈 在线率', value:'93.8%', sub:'目标 ≥ 95%', cls:'card-blue' },
+    { label:'📋 待处理工单', value:'5', sub:'2 张已超时', cls:'card-yellow' },
+  ],
+  devices: [
+    { id:1, name:'1号光伏阵列', type:'光伏板', location:'A区屋顶', status:'normal', lastCheck:'10分钟前' },
+    { id:2, name:'2号光伏阵列', type:'光伏板', location:'B区屋顶', status:'normal', lastCheck:'5分钟前' },
+    { id:3, name:'3号光伏阵列', type:'光伏板', location:'C区屋顶', status:'normal', lastCheck:'8分钟前' },
+    { id:4, name:'主逆变器-01', type:'逆变器', location:'配电房1号柜', status:'warning', lastCheck:'2分钟前' },
+    { id:5, name:'主逆变器-02', type:'逆变器', location:'配电房2号柜', status:'normal', lastCheck:'12分钟前' },
+    { id:6, name:'储能柜-E01', type:'储能柜', location:'储能站A区', status:'normal', lastCheck:'15分钟前' },
+    { id:7, name:'储能柜-E02', type:'储能柜', location:'储能站B区', status:'normal', lastCheck:'3分钟前' },
+    { id:8, name:'充电桩-CP01', type:'充电桩', location:'停车场东侧', status:'offline', lastCheck:'6小时前' },
+    { id:9, name:'充电桩-CP02', type:'充电桩', location:'停车场西侧', status:'fault', lastCheck:'30分钟前' },
+    { id:10, name:'汇流箱-H01', type:'汇流箱', location:'A区配电间', status:'normal', lastCheck:'7分钟前' },
+    { id:11, name:'变压器-T01', type:'变压器', location:'升压站', status:'normal', lastCheck:'1分钟前' },
+    { id:12, name:'气象站-WS01', type:'气象站', location:'场站中心', status:'normal', lastCheck:'实时' },
+  ],
+  alerts: [
+    { id:1, device:'主逆变器-01', title:'输出电压波动异常', time:'2分钟前', level:'warning', desc:'过去15分钟内，输出电压在360V-420V之间波动，正常范围应为380V±2%。' },
+    { id:2, device:'充电桩-CP02', title:'通信模块无响应', time:'30分钟前', level:'fault', desc:'设备连续5次心跳包超时，可能原因为网络故障或主板异常。' },
+    { id:3, device:'储能柜-E01', title:'电芯温差过大', time:'1小时前', level:'warning', desc:'4号电芯温度38.5℃，7号电芯温度26.1℃，温差12.4℃，超过安全阈值。' },
+    { id:4, device:'充电桩-CP01', title:'设备离线超过6小时', time:'6小时前', level:'offline', desc:'最后一次心跳信号为6小时前，需人工现场排查。' },
+    { id:5, device:'1号光伏阵列', title:'发电效率轻微下降', time:'3小时前', level:'info', desc:'今日发电效率较昨日同期下降4.2%，可能受云层遮挡影响。' },
+  ],
+  aiResult: [
+    `✅ <b>诊断完成</b> (诊断编号 #D${String(diagnosisCount+1).padStart(4,'0')})<br><br>
+    📊 <b>全场站设备健康度: <span class="highlight">87.5%</span></b><br><br>
+    ⚠️ <span class="highlight">3 台设备需关注：</span><br>
+    1. <b>主逆变器-01</b> — 输出电压波动 ≥5%，建议 <span class="highlight">48小时内安排检修</span>，怀疑IGBT模块老化<br>
+    2. <b>充电桩-CP02</b> — 通信异常，<span class="highlight">建议立即派单</span>现场排查，可能为4G模块松脱<br>
+    3. <b>储能柜-E01</b> — 电芯温差12.4℃，<span class="highlight">建议检查BMS均衡策略</span>，长期温差可致电芯寿命衰减<br><br>
+    💡 <b>AI 优化建议：</b>1号光伏阵列今日效率下降4.2%，预估为天气因素；建议明日对比同期数据确认。`,
+    `✅ <b>诊断完成</b> (诊断编号 #D${String(diagnosisCount+1).padStart(4,'0')})<br><br>
+    📊 <b>全场站设备健康度: <span class="highlight">89.2%</span></b><br><br>
+    ⚠️ <span class="highlight">2 台设备需关注：</span><br>
+    1. <b>充电桩-CP02</b> — 通信恢复后仍不稳定，<span class="highlight">建议本周更换4G模块</span><br>
+    2. <b>主逆变器-01</b> — 本次巡检波动回落至3%，<span class="highlight">持续监控</span>即可<br><br>
+    💡 全场站发电量今日预估 1,820 kWh，较昨日增长 2.1%。`
+  ],
+  deviceReadings: [
+    { metric:'输出电压', valFn:()=>(378+Math.random()*8).toFixed(1)+' V', ok:true },
+    { metric:'输出电流', valFn:()=>(12+Math.random()*3).toFixed(2)+' A', ok:true },
+    { metric:'设备温度', valFn:()=>(42+Math.random()*5).toFixed(1)+' ℃', ok:true },
+    { metric:'发电功率', valFn:()=>(4.2+Math.random()*1.5).toFixed(2)+' kW', ok:true },
+    { metric:'绝缘电阻', valFn:()=>(98+Math.random()*2).toFixed(1)+' MΩ', ok:true },
+  ]
+};
+
+// ─── 汽车产线数据 ───────────────────────
+const AUTO = {
+  title: '📊 数据驾驶舱 · 汽车产线',
+  status: '产线运行中 · 实时数据刷新',
+  stats: [
+    { label:'🏭 设备总数', value:'36', sub:'3 条产线 · 满负荷', cls:'card-green' },
+    { label:'⚠️ 异常设备', value:'2', sub:'需立即处理', cls:'card-red', filter:'alert' },
+    { label:'📈 产线稼动率', value:'91.2%', sub:'目标 ≥ 92%', cls:'card-blue' },
+    { label:'📋 待处理工单', value:'3', sub:'1 张已超时', cls:'card-yellow' },
+  ],
+  devices: [
+    { id:1, name:'焊接机器人-RB01', type:'焊接机器人', location:'焊装车间 A线', status:'normal', lastCheck:'3分钟前' },
+    { id:2, name:'焊接机器人-RB02', type:'焊接机器人', location:'焊装车间 A线', status:'warning', lastCheck:'1分钟前' },
+    { id:3, name:'焊接机器人-RB03', type:'焊接机器人', location:'焊装车间 B线', status:'normal', lastCheck:'5分钟前' },
+    { id:4, name:'冲压机-PR01', type:'冲压机', location:'冲压车间 1号工位', status:'normal', lastCheck:'8分钟前' },
+    { id:5, name:'冲压机-PR02', type:'冲压机', location:'冲压车间 2号工位', status:'normal', lastCheck:'4分钟前' },
+    { id:6, name:'喷涂机器人-PT01', type:'涂装机器人', location:'涂装车间 A线', status:'normal', lastCheck:'6分钟前' },
+    { id:7, name:'喷涂机器人-PT02', type:'涂装机器人', location:'涂装车间 A线', status:'fault', lastCheck:'20分钟前' },
+    { id:8, name:'AGV搬运车-03', type:'AGV小车', location:'总装车间 物流区', status:'normal', lastCheck:'实时' },
+    { id:9, name:'AGV搬运车-05', type:'AGV小车', location:'总装车间 物流区', status:'offline', lastCheck:'4小时前' },
+    { id:10, name:'拧紧机-TQ01', type:'拧紧机', location:'总装车间 底盘线', status:'normal', lastCheck:'2分钟前' },
+    { id:11, name:'检测站-VS01', type:'视觉检测', location:'总装车间 质检线', status:'normal', lastCheck:'实时' },
+  ],
+  alerts: [
+    { id:1, device:'焊接机器人-RB02', title:'焊点温度异常波动', time:'1分钟前', level:'warning', desc:'电极温度升至 82℃，正常范围 55-70℃。连续焊接 120 个焊点未冷却，建议暂停检查冷却系统。' },
+    { id:2, device:'涂装机器人-PT02', title:'喷涂厚度超标', time:'20分钟前', level:'fault', desc:'第 3 层清漆喷涂厚度 58μm，标准 40-50μm。可能为喷枪雾化器堵塞或气压异常。' },
+    { id:3, device:'AGV搬运车-05', title:'设备离线超过4小时', time:'4小时前', level:'offline', desc:'最后一次心跳信号为4小时前，需人工现场排查电池或WiFi模块。' },
+    { id:4, device:'焊接机器人-RB01', title:'送丝速度轻微下降', time:'2小时前', level:'info', desc:'送丝速度较标准值下降 3.2%，当前仍在可接受范围内，建议下次保养时检查送丝轮磨损。' },
+  ],
+  aiResult: [
+    `✅ <b>诊断完成</b> (诊断编号 #D${String(diagnosisCount+1).padStart(4,'0')})<br><br>
+    📊 <b>全产线设备健康度: <span class="highlight">85.7%</span></b><br><br>
+    ⚠️ <span class="highlight">2 台设备需关注：</span><br>
+    1. <b>焊接机器人-RB02</b> — 焊点温度持续偏高，<span class="highlight">建议 4 小时内停机检查</span>，怀疑冷却液循环泵效率下降<br>
+    2. <b>涂装机器人-PT02</b> — 喷枪雾化器异常，<span class="highlight">建议立即派单更换雾化器</span>，继续使用将影响涂装合格率<br><br>
+    💡 <b>AI 预测：</b>焊接机器人-RB01 送丝速度趋势显示 120 小时后可能触发报警，建议下次定期保养时提前更换送丝轮。`,
+    `✅ <b>诊断完成</b> (诊断编号 #D${String(diagnosisCount+1).padStart(4,'0')})<br><br>
+    📊 <b>全产线设备健康度: <span class="highlight">88.9%</span></b><br><br>
+    ⚠️ <span class="highlight">1 台设备需关注：</span><br>
+    1. <b>焊接机器人-RB02</b> — 本次巡检温度回落至 74℃，<span class="highlight">持续监控</span>，趋势分析提示可能为间歇性问题<br><br>
+    💡 当前班次预计产出 2,180 台白车身，设备运转正常率 91.2%，较昨日提升 1.5%。`
+  ],
+  deviceReadings: [
+    { metric:'伺服电机转速', valFn:()=>(1420+Math.random()*80).toFixed(0)+' rpm', ok:true },
+    { metric:'主轴振动', valFn:()=>(0.8+Math.random()*1.2).toFixed(2)+' mm/s', ok:true },
+    { metric:'液压压力', valFn:()=>(15.5+Math.random()*2).toFixed(1)+' MPa', ok:true },
+    { metric:'电机温度', valFn:()=>(48+Math.random()*6).toFixed(1)+' ℃', ok:true },
+    { metric:'电流负载', valFn:()=>(62+Math.random()*12).toFixed(1)+' %', ok:true },
+  ]
+};
+
+// ─── 获取当前场景数据 ──────────────────
+function S() { return currentScene === 'solar' ? SOLAR : AUTO; }
+
+// ─── 场景切换 ──────────────────────────
+function switchScene(scene) {
+  currentScene = scene;
+  document.body.className = 'scene-' + scene;
+
+  // 更新 Tab 样式
+  document.getElementById('tabSolar').classList.toggle('active', scene === 'solar');
+  document.getElementById('tabAuto').classList.toggle('active', scene === 'auto');
+
+  // 更新头部
+  document.getElementById('sceneTitle').textContent = S().title;
+  document.getElementById('sceneStatus').textContent = S().status;
+
+  // 重新渲染
+  renderAll();
+}
+
+// ─── 渲染统计卡片 ──────────────────────
+function renderStats() {
+  const sc = S();
+  const container = document.getElementById('statCards');
+  const alertDevices = sc.devices.filter(d => d.status !== 'normal').length;
+
+  container.innerHTML = sc.stats.map((s, i) => {
+    let val = s.value;
+    if (i === 1) val = alertDevices; // 动态异常数
+    let extra = '';
+    if (s.filter) {
+      extra = `onclick="filterDevices('alert')" style="cursor:pointer;"`;
+    }
+    return `<div class="stat-card ${s.cls}" ${extra}>
+      <div class="label">${s.label}</div>
+      <div class="value">${val}</div>
+      <div class="sub">${s.sub}</div>
+    </div>`;
+  }).join('');
+}
+
+// ─── 渲染设备表格 ──────────────────────
+function renderDevices(filter='all') {
+  const sc = S();
+  const tbody = document.getElementById('deviceTable');
+  let devices = filter === 'all' ? sc.devices : sc.devices.filter(d => d.status !== 'normal');
+
+  tbody.innerHTML = devices.map(d => `
+    <tr onclick="showDeviceDetail(${d.id})" style="cursor:pointer;">
+      <td style="color:#57c7ff;">${d.name}</td>
+      <td>${d.type}</td>
+      <td style="color:#8892b0;">${d.location}</td>
+      <td><span class="badge badge-${d.status}">${
+        d.status==='normal'?'正常':d.status==='warning'?'预警':d.status==='fault'?'故障':'离线'
+      }</span></td>
+      <td style="color:#495670;">${d.lastCheck}</td>
+    </tr>
+  `).join('');
+}
+
+// ─── 渲染报警列表 ──────────────────────
+function renderAlerts() {
+  const sc = S();
+  const list = document.getElementById('alertList');
+  list.innerHTML = sc.alerts.map(a => `
+    <div class="alert-item">
+      <span class="alert-icon">${a.level==='fault'?'🔴':a.level==='warning'?'🟡':'🔵'}</span>
+      <div class="alert-info">
+        <div class="alert-title">${a.device} · ${a.title}</div>
+        <div class="alert-time">${a.time}</div>
+      </div>
+      <div class="alert-dot ${a.level==='fault'?'dot-red':'dot-yellow'}"></div>
+    </div>
+  `).join('');
+}
+
+// ─── 设备详情弹窗 ──────────────────────
+function showDeviceDetail(id) {
+  const sc = S();
+  const d = sc.devices.find(x => x.id === id);
+  if (!d) return;
+
+  document.getElementById('modalContent').innerHTML = `
+    <h3>${d.name} · 实时监测数据</h3>
+    <div class="device-name">${d.type} · ${d.location}</div>
+    ${sc.deviceReadings.map(r => `
+      <div class="reading">
+        <span class="metric">${r.metric}</span>
+        <span class="val" style="color:${r.ok?'#00e396':'#ff5555'}">${r.valFn()}</span>
+      </div>
+    `).join('')}
+    <div style="margin-top:12px;font-size:12px;color:#495670;">数据更新: ${new Date().toLocaleTimeString()}</div>
+    <button class="close-btn" onclick="closeModal()">关闭</button>
+  `;
+  document.getElementById('deviceModal').classList.add('show');
+}
+
+function closeModal() {
+  document.getElementById('deviceModal').classList.remove('show');
+}
+
+// ─── AI 诊断 ──────────────────────────
+function runAIDiagnosis() {
+  const sc = S();
+  const resultBox = document.getElementById('aiResult');
+  const totalDevices = sc.devices.length;
+  resultBox.innerHTML = `⏳ <span style="color:#ffb86c;">AI 正在分析全场景 ${totalDevices} 台设备数据...</span>`;
+
+  setTimeout(() => {
+    diagnosisCount++;
+    const reports = sc.aiResult;
+    resultBox.innerHTML = reports[diagnosisCount % reports.length]
+      .replace(/D\d{4}/, 'D' + String(diagnosisCount).padStart(4, '0'));
+    document.getElementById('aiSection').scrollIntoView({ behavior:'smooth' });
+  }, 1500);
+}
+
+// ─── 筛选 ──────────────────────────────
+function filterDevices(type) {
+  renderDevices(type);
+}
+
+// ─── 全部渲染 ──────────────────────────
+function renderAll() {
+  renderStats();
+  renderDevices();
+  renderAlerts();
+}
+
+// ─── 点击遮罩关闭弹窗 ──────────────────
+document.getElementById('deviceModal').addEventListener('click', function(e) {
+  if (e.target === this) closeModal();
+});
+
+// ─── 页面启动 ──────────────────────────
+renderAll();
+</script>
+
+</body>
+</html>

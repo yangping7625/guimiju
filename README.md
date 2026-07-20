@@ -76,9 +76,6 @@ guimiju/
 ├── index.html             # V1 主页面 (HTML + 内联 CSS, 61KB)
 ├── game.js                # V1 游戏逻辑 (69KB, ~1900 行)
 ├── puzzles.js             # 90 道谜题数据 (63KB)
-├── pay-confirm.html       # 支付确认页
-├── admin-redeem.html      # 兑换码管理后台
-├── promo-animation.html   # 宣传动画
 │
 ├── v2-frontend/           # V2 多人版前端 (181 个文件)
 │   ├── lobby.html         # 游戏大厅（主入口）
@@ -104,7 +101,6 @@ guimiju/
 │   ├── genPuzzle/         # AI 定制生成单道谜题
 │   └── generatePuzzles/   # AI 批量生成谜题
 │
-├── server.js              # 本地开发 Node.js 服务
 ├── v2-modules/            # V2 共享类型定义
 ├── sounds/                # 音效文件
 ├── assets/                # 公共素材（图片/Logo）
@@ -155,15 +151,9 @@ npx serve v2-frontend
 
 ---
 
-## 🧪 内测账号
+## 🧪 内测
 
-### V1 兑换码
-- 通用码：`GUIMIJU90` — 解锁全部 90 道谜题
-
-### V2 GM 账号
-- 用户名：`gmadmin`
-- 密码：`guimiju2026`
-- 特性：无限金币/宝石，购买和抽卡免费
+- V1 试用兑换码：`GUIMIJU90` — 解锁全部 90 道谜题
 
 ---
 
